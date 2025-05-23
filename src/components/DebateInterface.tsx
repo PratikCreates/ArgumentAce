@@ -2,52 +2,55 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import type { DebateSession, ReasoningSkill, AnalyzeArgumentOutput, ResearchTopicOutput, DebateTurn } from '@/types';
+import type { DebateSession, ReasoningSkill, AnalyzeArgumentOutput, ResearchTopicOutput, DebateTurn, JudgeDebateOutput } from '@/types';
 import { generateArgument } from '@/ai/flows/generate-argument';
 import { analyzeArgument } from '@/ai/flows/real-time-feedback';
 import { generateCounterArgument } from '@/ai/flows/generate-counter-argument';
 import { researchTopic } from '@/ai/flows/research-topic-flow';
+import { judgeDebate } from '@/ai/flows/judge-debate-flow'; // New flow
 import useLocalStorage from '@/hooks/useLocalStorage';
 import { useToast } from '@/hooks/use-toast';
 
 import ArgumentAceLogo from './ArgumentAceLogo';
 import ArgumentGeneratorControls from './ArgumentGeneratorControls';
-import ArgumentDisplay from './ArgumentDisplay'; // For AI suggested argument
+import ArgumentDisplay from './ArgumentDisplay';
 import FeedbackDisplay from './FeedbackDisplay';
-// import OpponentArgumentDisplay from './OpponentArgumentDisplay'; // Replaced by DebateLogDisplay
 import DebateLogDisplay from './DebateLogDisplay';
 import ResearchAssistantDisplay from './ResearchAssistantDisplay';
+import JuryVerdictDisplay from './JuryVerdictDisplay'; // New component
 import PastSessionsDialog from './PastSessionsDialog';
 
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { History, MessageSquareText, Save, Send, Loader2, Swords, Bot, Sparkles } from 'lucide-react';
+import { History, MessageSquareText, Save, Send, Loader2, Gavel, Scale } from 'lucide-react';
 import { ScrollArea } from './ui/scroll-area';
 
 const SESSIONS_STORAGE_KEY = 'argumentAceSessions';
+const MIN_TURNS_FOR_JURY = 4; // User + AI + User + AI = 4 turns minimum
 
 const DebateInterface: React.FC = () => {
   const [topic, setTopic] = useState<string>('');
   const [reasoningSkill, setReasoningSkill] = useState<ReasoningSkill>('Intermediate');
-  const [generatedArgument, setGeneratedArgument] = useState<string | null>(null); // For "Generate AI Argument" feature
+  const [generatedArgument, setGeneratedArgument] = useState<string | null>(null);
   
-  const [userArgumentInput, setUserArgumentInput] = useState<string>(''); // Current text in textarea
+  const [userArgumentInput, setUserArgumentInput] = useState<string>('');
   const [debateLog, setDebateLog] = useState<DebateTurn[]>([]);
   
   const [feedback, setFeedback] = useState<AnalyzeArgumentOutput | null>(null);
   const [researchPoints, setResearchPoints] = useState<string[] | null>(null);
+  const [juryVerdict, setJuryVerdict] = useState<JudgeDebateOutput | null>(null); // New state
 
   const [isLoadingAiSuggestedArgument, setIsLoadingAiSuggestedArgument] = useState<boolean>(false);
   const [isLoadingFeedbackAndAiTurn, setIsLoadingFeedbackAndAiTurn] = useState<boolean>(false);
   const [isLoadingResearch, setIsLoadingResearch] = useState<boolean>(false);
+  const [isLoadingJuryVerdict, setIsLoadingJuryVerdict] = useState<boolean>(false); // New loading state
 
   const [sessions, setSessions] = useLocalStorage<DebateSession[]>(SESSIONS_STORAGE_KEY, []);
   const [isPastSessionsDialogOpen, setIsPastSessionsDialogOpen] = useState<boolean>(false);
 
   const { toast } = useToast();
 
-  // Handles "Generate AI Argument" button (suggestion for user)
   const handleGenerateAiSuggestion = async () => {
     if (!topic.trim()) {
       toast({ title: "Topic Required", description: "Please enter a debate topic.", variant: "destructive" });
@@ -55,6 +58,7 @@ const DebateInterface: React.FC = () => {
     }
     setIsLoadingAiSuggestedArgument(true);
     setGeneratedArgument(null);
+    setJuryVerdict(null); // Clear jury verdict if new argument is generated
     try {
       const result = await generateArgument({ topic, reasoningSkill });
       setGeneratedArgument(result.argument);
@@ -73,6 +77,7 @@ const DebateInterface: React.FC = () => {
     }
     setIsLoadingResearch(true);
     setResearchPoints(null);
+    setJuryVerdict(null); // Clear jury verdict if topic is researched
     try {
       const result: ResearchTopicOutput = await researchTopic({ topic });
       setResearchPoints(result.researchPoints);
@@ -96,21 +101,20 @@ const DebateInterface: React.FC = () => {
 
     setIsLoadingFeedbackAndAiTurn(true);
     setFeedback(null);
+    setJuryVerdict(null); // Clear previous jury verdict when a new turn is submitted
 
     const newUserTurn: DebateTurn = { speaker: 'user', text: userArgumentInput, timestamp: new Date().toISOString() };
     const updatedDebateLog = [...debateLog, newUserTurn];
     setDebateLog(updatedDebateLog);
-    setUserArgumentInput(''); // Clear input for next turn
+    setUserArgumentInput(''); 
 
     try {
-      // 1. Get feedback for the user's current turn
       const feedbackResult = await analyzeArgument({ argument: newUserTurn.text, topic });
       setFeedback(feedbackResult);
 
-      // 2. Get AI opponent's counter-argument
       const formattedHistory = updatedDebateLog
         .map(turn => `${turn.speaker === 'user' ? 'User' : 'AI'}: "${turn.text}"`)
-        .join('\n');
+        .join('\n\n');
       
       const aiCounterResult = await generateCounterArgument({
         topic,
@@ -124,15 +128,37 @@ const DebateInterface: React.FC = () => {
     } catch (error) {
       console.error("Error processing turn:", error);
       toast({ title: "Error Processing Turn", description: "Failed to get feedback or AI response. Please try again.", variant: "destructive" });
-      // Optionally, remove user's turn from log if AI part fails critically, or allow retry
     } finally {
       setIsLoadingFeedbackAndAiTurn(false);
     }
   };
 
+  const handleRequestJuryVerdict = async () => {
+    if (debateLog.length < MIN_TURNS_FOR_JURY) {
+      toast({ title: "Not Enough Debate", description: `Please have at least ${MIN_TURNS_FOR_JURY / 2} exchanges before requesting a verdict.`, variant: "destructive" });
+      return;
+    }
+    setIsLoadingJuryVerdict(true);
+    setJuryVerdict(null);
+    try {
+      const formattedHistory = debateLog
+        .map(turn => `${turn.speaker === 'user' ? 'User' : 'AI'}: "${turn.text}"`)
+        .join('\n\n');
+      const result = await judgeDebate({ topic, formattedDebateHistory: formattedHistory });
+      setJuryVerdict(result);
+    } catch (error) {
+      console.error("Error requesting jury verdict:", error);
+      toast({ title: "Error Getting Verdict", description: "Failed to get jury verdict. Please try again.", variant: "destructive" });
+    } finally {
+      setIsLoadingJuryVerdict(false);
+    }
+  };
+
+
   const handleUseAiSuggestedArgument = (argument: string) => {
-    setUserArgumentInput(argument); // Load into main input area
-    setGeneratedArgument(null); // Clear the suggestion box
+    setUserArgumentInput(argument);
+    setGeneratedArgument(null);
+    setJuryVerdict(null);
     toast({ title: "Argument Loaded", description: "AI suggested argument loaded for your turn." });
   };
 
@@ -141,13 +167,13 @@ const DebateInterface: React.FC = () => {
   };
   
   useEffect(() => {
-    // Reset relevant states when topic changes
     setResearchPoints(null);
-    setGeneratedArgument(null); // AI suggestion
+    setGeneratedArgument(null);
     setFeedback(null);
     setDebateLog([]);
     setUserArgumentInput('');
-  }, [topic]);
+    setJuryVerdict(null);
+  }, [topic, reasoningSkill]); // Resetting on reasoningSkill change too
 
 
   const handleSaveSession = () => {
@@ -159,8 +185,9 @@ const DebateInterface: React.FC = () => {
       id: Date.now().toString(),
       topic,
       debateLog,
-      feedback: feedback ?? undefined, // Feedback for the last user turn
+      feedback: feedback ?? undefined, 
       researchPoints: researchPoints ?? undefined,
+      juryVerdict: juryVerdict ?? undefined, // Save jury verdict
       timestamp: new Date().toISOString(),
       reasoningSkill,
     };
@@ -173,9 +200,10 @@ const DebateInterface: React.FC = () => {
     setDebateLog(session.debateLog);
     setFeedback(session.feedback || null);
     setResearchPoints(session.researchPoints || null);
+    setJuryVerdict(session.juryVerdict || null); // Load jury verdict
     setReasoningSkill(session.reasoningSkill || 'Intermediate');
-    setUserArgumentInput(''); // Clear current input
-    setGeneratedArgument(null); // Clear AI suggestion
+    setUserArgumentInput(''); 
+    setGeneratedArgument(null); 
     toast({ title: "Session Loaded", description: `Session for topic "${session.topic}" has been loaded.` });
   };
 
@@ -190,37 +218,46 @@ const DebateInterface: React.FC = () => {
   };
   
   const userLastTurnText = debateLog.filter(t => t.speaker === 'user').pop()?.text || "";
+  const canRequestVerdict = debateLog.length >= MIN_TURNS_FOR_JURY && !isLoadingJuryVerdict && !isLoadingFeedbackAndAiTurn;
 
   return (
     <div className="min-h-screen flex flex-col p-4 md:p-6 bg-background">
       <header className="flex flex-col sm:flex-row justify-between items-center mb-6 pb-4 border-b">
         <ArgumentAceLogo />
-        <div className="flex gap-2 mt-4 sm:mt-0">
-          <Button variant="outline" onClick={handleSaveSession} disabled={(!topic && debateLog.length === 0) || isLoadingFeedbackAndAiTurn}>
+        <div className="flex flex-wrap gap-2 mt-4 sm:mt-0">
+          <Button 
+            variant="outline" 
+            onClick={handleRequestJuryVerdict} 
+            disabled={!canRequestVerdict}
+            title={debateLog.length < MIN_TURNS_FOR_JURY ? `Need at least ${MIN_TURNS_FOR_JURY - debateLog.length} more turn(s) for a verdict` : "Get Jury Verdict"}
+          >
+            {isLoadingJuryVerdict ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Gavel className="mr-2 h-4 w-4" />}
+            Jury Verdict
+          </Button>
+          <Button variant="outline" onClick={handleSaveSession} disabled={(!topic && debateLog.length === 0) || isLoadingFeedbackAndAiTurn || isLoadingJuryVerdict}>
             <Save className="mr-2 h-4 w-4" /> Save Session
           </Button>
           <Button variant="outline" onClick={() => setIsPastSessionsDialogOpen(true)}>
-            <History className="mr-2 h-4 w-4" /> View Past Sessions
+            <History className="mr-2 h-4 w-4" /> Past Sessions
           </Button>
         </div>
       </header>
 
       <main className="flex-grow grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Left Panel */}
-        <ScrollArea className="h-[calc(100vh-150px)] md:h-auto">
+        <ScrollArea className="h-[calc(100vh-170px)] md:h-auto"> {/* Adjusted height for header */}
           <div className="space-y-6 pr-3">
             <ArgumentGeneratorControls
               topic={topic}
               setTopic={setTopic}
               reasoningSkill={reasoningSkill}
               setReasoningSkill={setReasoningSkill}
-              onGenerateArgument={handleGenerateAiSuggestion} // This is for "Suggest an argument for me"
+              onGenerateArgument={handleGenerateAiSuggestion}
               onResearchTopic={handleResearchTopic}
               isLoadingArgument={isLoadingAiSuggestedArgument}
               isLoadingResearch={isLoadingResearch}
             />
 
-            {/* Display for AI Suggested Argument (for user to use) */}
             <ArgumentDisplay
               generatedArgument={generatedArgument}
               isLoading={isLoadingAiSuggestedArgument}
@@ -247,12 +284,13 @@ const DebateInterface: React.FC = () => {
                   placeholder="Type your argument here..."
                   value={userArgumentInput}
                   onChange={(e) => setUserArgumentInput(e.target.value)}
-                  className="min-h-[200px] text-base"
+                  className="min-h-[150px] md:min-h-[200px] text-base"
                   aria-label="Your Argument Input"
+                  disabled={isLoadingFeedbackAndAiTurn || isLoadingJuryVerdict}
                 />
                 <Button 
                   onClick={handleSubmitUserTurn} 
-                  disabled={isLoadingFeedbackAndAiTurn || !userArgumentInput.trim() || !topic.trim()} 
+                  disabled={isLoadingFeedbackAndAiTurn || isLoadingJuryVerdict || !userArgumentInput.trim() || !topic.trim()} 
                   className="mt-4 w-full"
                 >
                   {isLoadingFeedbackAndAiTurn ? (
@@ -268,26 +306,27 @@ const DebateInterface: React.FC = () => {
         </ScrollArea>
 
         {/* Right Panel */}
-        <ScrollArea className="h-[calc(100vh-150px)] md:h-auto">
+        <ScrollArea className="h-[calc(100vh-170px)] md:h-auto"> {/* Adjusted height for header */}
           <div className="space-y-6 md:sticky md:top-6 pr-1">
+             <JuryVerdictDisplay
+              verdict={juryVerdict}
+              isLoading={isLoadingJuryVerdict}
+              topic={topic}
+            />
             <ResearchAssistantDisplay 
               researchPoints={researchPoints}
               isLoading={isLoadingResearch}
               topic={topic}
             />
-            
             <DebateLogDisplay 
               debateLog={debateLog}
               topic={topic}
-              isLoadingAiResponse={isLoadingFeedbackAndAiTurn && userArgumentInput === ''} // Show loading in log if AI is "typing"
+              isLoadingAiResponse={isLoadingFeedbackAndAiTurn && userArgumentInput === ''}
             />
-
             <FeedbackDisplay 
                 feedback={feedback} 
-                isLoading={isLoadingFeedbackAndAiTurn && userArgumentInput !== '' && userLastTurnText !== ''} // Show loading feedback if processing user's submitted text
-                // Pass the user's last argument text to FeedbackDisplay if it needs it for context, or ensure feedback object contains it
+                isLoading={isLoadingFeedbackAndAiTurn && userArgumentInput !== '' && userLastTurnText !== ''}
             />
-            
           </div>
         </ScrollArea>
       </main>

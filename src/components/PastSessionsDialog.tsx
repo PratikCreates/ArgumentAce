@@ -1,11 +1,11 @@
 
 "use client";
 
-import type { DebateSession, DebateTurn } from '@/types';
+import type { DebateSession } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Trash2, Eye, AlertCircle, BookOpen, Bot, Users } from 'lucide-react';
+import { Trash2, Eye, AlertCircle, BookOpen, Users, Gavel } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 
@@ -36,7 +36,6 @@ const PastSessionsDialog: React.FC<PastSessionsDialogProps> = ({
         {sessions.length > 0 ? (
           <ScrollArea className="h-[450px] pr-4">
             <div className="space-y-3">
-              {/* Ensure sessions are sorted with the newest first if not already */}
               {sessions.map((session) => (
                 <div key={session.id} className="p-3 border rounded-lg hover:bg-muted/50 transition-colors">
                   <div className="flex items-start justify-between">
@@ -44,6 +43,7 @@ const PastSessionsDialog: React.FC<PastSessionsDialogProps> = ({
                       <p className="font-semibold truncate max-w-[350px] sm:max-w-[450px]">{session.topic || "Untitled Session"}</p>
                       <p className="text-xs text-muted-foreground">
                         Saved {formatDistanceToNow(new Date(session.timestamp), { addSuffix: true })}
+                         {` (${session.reasoningSkill || 'Intermediate'} level)`}
                       </p>
                     </div>
                     <div className="flex gap-2 flex-shrink-0 ml-2">
@@ -72,24 +72,30 @@ const PastSessionsDialog: React.FC<PastSessionsDialogProps> = ({
                     {session.debateLog && session.debateLog.length > 0 && (
                        <Badge variant="outline" className="text-xs">
                         <Users className="h-3 w-3 mr-1" />
-                        {session.debateLog.filter(t => t.speaker === 'user').length} User Turn{session.debateLog.filter(t => t.speaker === 'user').length === 1 ? '' : 's'}
+                        {session.debateLog.length} Turn{session.debateLog.length === 1 ? '' : 's'}
                       </Badge>
                     )}
                     {session.feedback && session.feedback.fallacies && session.feedback.fallacies.length > 0 && (
                       <Badge variant="destructive" className="text-xs">
                         <AlertCircle className="h-3 w-3 mr-1" />
-                        {session.feedback.fallacies.length} Fallac{session.feedback.fallacies.length === 1 ? 'y' : 'ies'} (last turn)
+                        {session.feedback.fallacies.length} Fallac{session.feedback.fallacies.length === 1 ? 'y' : 'ies'} (last user turn)
                       </Badge>
                     )}
                      {session.feedback && session.feedback.fallacies && session.feedback.fallacies.length === 0 && (
                       <Badge variant="secondary" className="text-xs bg-green-100 text-green-700 border-green-300">
-                        No Fallacies (last turn)
+                        No Fallacies (last user turn)
                       </Badge>
                     )}
                     {session.researchPoints && session.researchPoints.length > 0 && (
                       <Badge variant="outline" className="text-xs">
                         <BookOpen className="h-3 w-3 mr-1" />
                         Researched
+                      </Badge>
+                    )}
+                    {session.juryVerdict && (
+                      <Badge variant="default" className="text-xs bg-primary/80 text-primary-foreground">
+                        <Gavel className="h-3 w-3 mr-1" />
+                        Judged
                       </Badge>
                     )}
                   </div>
