@@ -1,3 +1,4 @@
+
 import type { AnalyzeArgumentOutput as AIAnalyzeArgumentOutput } from '@/ai/flows/real-time-feedback';
 
 export type ReasoningSkill = "Beginner" | "Intermediate" | "Advanced";
@@ -8,6 +9,7 @@ export interface DebateSession {
   userArgument: string;
   generatedArgument?: string;
   feedback?: AIAnalyzeArgumentOutput;
+  aiOpponentArgument?: string;
   timestamp: string;
 }
 

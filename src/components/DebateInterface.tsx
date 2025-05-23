@@ -1,9 +1,11 @@
+
 "use client";
 
 import { useState, useEffect } from 'react';
 import type { DebateSession, ReasoningSkill, AnalyzeArgumentOutput } from '@/types';
 import { generateArgument } from '@/ai/flows/generate-argument';
 import { analyzeArgument } from '@/ai/flows/real-time-feedback';
+import { generateCounterArgument } from '@/ai/flows/generate-counter-argument';
 import useLocalStorage from '@/hooks/useLocalStorage';
 import { useToast } from '@/hooks/use-toast';
 
@@ -11,13 +13,14 @@ import ArgumentAceLogo from './ArgumentAceLogo';
 import ArgumentGeneratorControls from './ArgumentGeneratorControls';
 import ArgumentDisplay from './ArgumentDisplay';
 import FeedbackDisplay from './FeedbackDisplay';
+import OpponentArgumentDisplay from './OpponentArgumentDisplay';
 import PastSessionsDialog from './PastSessionsDialog';
 
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { History, MessageSquareText, Save, Send, Loader2 } from 'lucide-react';
+import { History, MessageSquareText, Save, Send, Loader2, Swords, Bot } from 'lucide-react';
 import { ScrollArea } from './ui/scroll-area';
 
 const SESSIONS_STORAGE_KEY = 'argumentAceSessions';
@@ -28,9 +31,11 @@ const DebateInterface: React.FC = () => {
   const [generatedArgument, setGeneratedArgument] = useState<string | null>(null);
   const [userArgument, setUserArgument] = useState<string>('');
   const [feedback, setFeedback] = useState<AnalyzeArgumentOutput | null>(null);
+  const [aiOpponentArgument, setAiOpponentArgument] = useState<string | null>(null);
 
   const [isLoadingArgument, setIsLoadingArgument] = useState<boolean>(false);
   const [isLoadingFeedback, setIsLoadingFeedback] = useState<boolean>(false);
+  const [isLoadingAiOpponent, setIsLoadingAiOpponent] = useState<boolean>(false);
 
   const [sessions, setSessions] = useLocalStorage<DebateSession[]>(SESSIONS_STORAGE_KEY, []);
   const [isPastSessionsDialogOpen, setIsPastSessionsDialogOpen] = useState<boolean>(false);
@@ -43,7 +48,9 @@ const DebateInterface: React.FC = () => {
       return;
     }
     setIsLoadingArgument(true);
-    setGeneratedArgument(null); // Clear previous generated argument
+    setGeneratedArgument(null); 
+    setAiOpponentArgument(null); // Clear opponent argument when generating new base argument
+    setFeedback(null); // Clear feedback
     try {
       const result = await generateArgument({ topic, reasoningSkill });
       setGeneratedArgument(result.argument);
@@ -65,7 +72,8 @@ const DebateInterface: React.FC = () => {
       return;
     }
     setIsLoadingFeedback(true);
-    setFeedback(null); // Clear previous feedback
+    setFeedback(null); 
+    setAiOpponentArgument(null); // Clear opponent argument when getting new feedback for user's argument
     try {
       const result = await analyzeArgument({ argument: userArgument, topic });
       setFeedback(result);
@@ -76,9 +84,39 @@ const DebateInterface: React.FC = () => {
       setIsLoadingFeedback(false);
     }
   };
+  
+  const handleGetAiOpponentArgument = async () => {
+    if (!userArgument.trim()) {
+      toast({ title: "Your Argument Required", description: "Please provide your argument before challenging the AI.", variant: "destructive" });
+      return;
+    }
+    if (!topic.trim()) {
+      toast({ title: "Topic Required", description: "A debate topic is needed for the AI opponent.", variant: "destructive" });
+      return;
+    }
+    setIsLoadingAiOpponent(true);
+    setAiOpponentArgument(null);
+    try {
+      const result = await generateCounterArgument({ 
+        topic, 
+        userArgument, 
+        opponentSkill: reasoningSkill // Using the same skill level for simplicity
+      });
+      setAiOpponentArgument(result.counterArgument);
+    } catch (error)
+    {
+      console.error("Error generating AI opponent argument:", error);
+      toast({ title: "Error Challenging AI", description: "Failed to get AI opponent's argument. Please try again.", variant: "destructive" });
+    } finally {
+      setIsLoadingAiOpponent(false);
+    }
+  };
+
 
   const handleUseArgument = (argument: string) => {
     setUserArgument(argument);
+    setFeedback(null); // Clear feedback if user changes argument
+    setAiOpponentArgument(null); // Clear opponent argument
     toast({ title: "Argument Loaded", description: "AI argument loaded into your text area for editing." });
   };
 
@@ -97,6 +135,7 @@ const DebateInterface: React.FC = () => {
       userArgument,
       generatedArgument: generatedArgument ?? undefined,
       feedback: feedback ?? undefined,
+      aiOpponentArgument: aiOpponentArgument ?? undefined,
       timestamp: new Date().toISOString(),
     };
     setSessions([...sessions, newSession]);
@@ -108,6 +147,7 @@ const DebateInterface: React.FC = () => {
     setUserArgument(session.userArgument);
     setGeneratedArgument(session.generatedArgument || null);
     setFeedback(session.feedback || null);
+    setAiOpponentArgument(session.aiOpponentArgument || null);
     setReasoningSkill('Intermediate'); // Reset or load from session if stored
     toast({ title: "Session Loaded", description: `Session for topic "${session.topic}" has been loaded.` });
   };
@@ -172,7 +212,11 @@ const DebateInterface: React.FC = () => {
               <Textarea
                 placeholder="Type or paste your argument here..."
                 value={userArgument}
-                onChange={(e) => setUserArgument(e.target.value)}
+                onChange={(e) => {
+                  setUserArgument(e.target.value);
+                  setFeedback(null); // Clear feedback if user edits argument
+                  setAiOpponentArgument(null); // Clear opponent argument
+                }}
                 className="min-h-[200px] text-base"
                 aria-label="Your Argument Input"
               />
@@ -191,8 +235,39 @@ const DebateInterface: React.FC = () => {
 
         {/* Right Panel */}
         <ScrollArea className="h-[calc(100vh-150px)] md:h-auto">
-          <div className="md:sticky md:top-6 pr-1"> {/* Sticky for desktop scrolling independence */}
+          <div className="space-y-6 md:sticky md:top-6 pr-1">
             <FeedbackDisplay feedback={feedback} isLoading={isLoadingFeedback} />
+            
+            {topic && userArgument && (
+              <Card className="shadow-lg">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Bot className="h-6 w-6 text-accent" />
+                    AI Opponent
+                  </CardTitle>
+                  {!aiOpponentArgument && !isLoadingAiOpponent && (
+                    <CardDescription>Challenge the AI to a counter-argument.</CardDescription>
+                  )}
+                </CardHeader>
+                <CardContent>
+                  {!aiOpponentArgument && !isLoadingAiOpponent && (
+                    <Button onClick={handleGetAiOpponentArgument} disabled={isLoadingAiOpponent || !userArgument.trim() || !topic.trim()} className="w-full">
+                      {isLoadingAiOpponent ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <Swords className="mr-2 h-4 w-4" />
+                      )}
+                      Challenge AI Opponent
+                    </Button>
+                  )}
+                  <OpponentArgumentDisplay
+                    opponentArgument={aiOpponentArgument}
+                    isLoading={isLoadingAiOpponent}
+                    topic={topic}
+                  />
+                </CardContent>
+              </Card>
+            )}
           </div>
         </ScrollArea>
       </main>
