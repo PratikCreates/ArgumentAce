@@ -1,8 +1,7 @@
-
-// src/app/share/[sessionId]/page.tsx
-"use client"; 
+"use client";
 
 import { useEffect, useState, useRef } from 'react';
+import { useParams } from 'next/navigation';
 import { getSharedSession } from '@/services/sharingService';
 import SharedSessionDisplay from '@/components/SharedSessionDisplay';
 import ArgumentAceLogo from '@/components/ArgumentAceLogo';
@@ -16,35 +15,33 @@ import { Skeleton } from '@/components/ui/skeleton';
 type jsPDFType = typeof import('jspdf').default;
 type html2canvasType = typeof import('html2canvas').default;
 
-
-export default function SharedSessionPage({ params }: { params: { sessionId: string } }) {
-  const [session, setSession] = useState<DebateSession | null | undefined>(undefined); 
+export default function SharedSessionPage() {
+  const { sessionId } = useParams(); // ✅ unwraps sessionId properly
+  const [session, setSession] = useState<DebateSession | null | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(true);
   const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
-  const [isPdfCapturePhase, setIsPdfCapturePhase] = useState(false); // New state for capture phase
+  const [isPdfCapturePhase, setIsPdfCapturePhase] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const fetchSession = async () => {
       setIsLoading(true);
       try {
-        const fetchedSession = await getSharedSession(params.sessionId);
+        const fetchedSession = await getSharedSession(sessionId as string);
         setSession(fetchedSession);
-        if (fetchedSession) {
-          document.title = `Debate: ${fetchedSession.topic} - ArgumentAce Shared Session`;
-        } else {
-          document.title = 'Session Not Found - ArgumentAce';
-        }
+        document.title = fetchedSession
+          ? `Debate: ${fetchedSession.topic} - ArgumentAce Shared Session`
+          : 'Session Not Found - ArgumentAce';
       } catch (error) {
         console.error("Failed to fetch session:", error);
-        setSession(null); 
+        setSession(null);
         document.title = 'Error Loading Session - ArgumentAce';
       } finally {
         setIsLoading(false);
       }
     };
     fetchSession();
-  }, [params.sessionId]);
+  }, [sessionId]);
 
   const generatePdf = async () => {
     if (!contentRef.current || !session) return;
@@ -57,47 +54,33 @@ export default function SharedSessionPage({ params }: { params: { sessionId: str
         scale: 2,
         useCORS: true,
         logging: false,
-        height: contentRef.current.scrollHeight, // Capture full scroll height
-        windowHeight: contentRef.current.scrollHeight, // Set window height for rendering
-        scrollY: 0, // Ensure capture starts from the top of the element
+        height: contentRef.current.scrollHeight,
+        windowHeight: contentRef.current.scrollHeight,
+        scrollY: 0,
       });
-      
+
       const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF({
-        orientation: 'portrait',
-        unit: 'pt',
-        format: 'a4',
-      });
+      const pdf = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
 
       const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = pdf.internal.pageSize.getHeight();
-      const margin = 30; // Page margin in points
-
+      const margin = 30;
       const imgProps = pdf.getImageProperties(imgData);
-      
-      // Scale image to fit width within margins
       const availableWidth = pdfWidth - 2 * margin;
       const scaleFactor = availableWidth / imgProps.width;
       const scaledImgHeight = imgProps.height * scaleFactor;
       const scaledImgWidth = imgProps.width * scaleFactor;
 
-
-      // Add title to PDF - ensure it's within margins
       pdf.setFontSize(18);
       pdf.text(session.topic, pdfWidth / 2, margin + 10, { align: 'center' });
 
-      // Add the image, allowing it to be truncated if it's taller than one page (for now)
       pdf.addImage(imgData, 'PNG', margin, margin + 30, scaledImgWidth, scaledImgHeight);
-      
       pdf.save(`ArgumentAce_Debate_${session.topic.replace(/[^a-z0-9]/gi, '_')}.pdf`);
-
     } catch (error) {
       console.error("Error generating PDF:", error);
       alert("Failed to generate PDF. Please try again.");
     }
   };
-  
-  // Effect to trigger PDF generation after state update for capture phase
+
   useEffect(() => {
     if (isPdfCapturePhase && contentRef.current && session) {
       generatePdf().finally(() => {
@@ -105,28 +88,27 @@ export default function SharedSessionPage({ params }: { params: { sessionId: str
         setIsDownloadingPdf(false);
       });
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isPdfCapturePhase, session]); // Removed generatePdf from deps as it causes loop
+  }, [isPdfCapturePhase, session]);
 
   const handleDownloadPdfClick = () => {
     if (!contentRef.current || !session) return;
     setIsDownloadingPdf(true);
-    setIsPdfCapturePhase(true); // Trigger re-render for PDF capture styles
+    setIsPdfCapturePhase(true);
   };
-  
+
   if (isLoading) {
     return (
-       <div className="min-h-screen flex flex-col items-center justify-center text-center p-4 bg-background">
+      <div className="min-h-screen flex flex-col items-center justify-center text-center p-4 bg-background">
         <ArgumentAceLogo size="lg" />
         <h1 className="text-3xl font-bold mt-8 mb-4">Loading Session...</h1>
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
         <div className="mt-8 w-full max-w-2xl space-y-4">
-            <Skeleton className="h-12 w-full" />
-            <Skeleton className="h-64 w-full" />
-            <Skeleton className="h-32 w-full" />
+          <Skeleton className="h-12 w-full" />
+          <Skeleton className="h-64 w-full" />
+          <Skeleton className="h-32 w-full" />
         </div>
       </div>
-    )
+    );
   }
 
   if (!session) {
@@ -136,8 +118,7 @@ export default function SharedSessionPage({ params }: { params: { sessionId: str
         <h1 className="text-3xl font-bold mt-8 mb-4">Session Not Found</h1>
         <p className="text-muted-foreground mb-8">
           The debate session you are looking for either does not exist, is no longer available,
-          or there was an issue loading it. This can happen if the server restarted since the session was shared,
-          as shared sessions are not persistently stored in this demo version.
+          or there was an issue loading it.
         </p>
         <Button asChild>
           <Link href="/">
@@ -156,31 +137,21 @@ export default function SharedSessionPage({ params }: { params: { sessionId: str
             <ArgumentAceLogo />
           </Link>
           <div className="flex gap-2 flex-wrap justify-center">
-            <Button 
-              variant="outline" 
-              onClick={handleDownloadPdfClick}
-              disabled={isDownloadingPdf}
-            >
-              {isDownloadingPdf ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Download className="mr-2 h-4 w-4" />
-              )}
-              Download as PDF
+            <Button variant="outline" onClick={handleDownloadPdfClick} disabled={isDownloadingPdf}>
+ {isDownloadingPdf ? (<Loader2 className="mr-2 h-4 w-4 animate-spin" />) : (<Download className="mr-2 h-4 w-4" />)}Download as PDF
             </Button>
             <Button variant="default" asChild>
               <Link href="/">
-               <Home className="mr-2 h-4 w-4" /> Create Your Own Debate
+                <Home className="mr-2 h-4 w-4" /> Create Your Own Debate
               </Link>
             </Button>
           </div>
         </div>
       </header>
-      {/* The ref is now on the direct parent of SharedSessionDisplay */}
-      <div ref={contentRef}> 
+      <div ref={contentRef}>
         <SharedSessionDisplay session={session} isPdfCapturePhase={isPdfCapturePhase} />
       </div>
-       <footer className="py-8 text-center text-muted-foreground">
+      <footer className="py-8 text-center text-muted-foreground">
         <p>&copy; {new Date().getFullYear()} ArgumentAce. Powered by AI.</p>
         <p>
           <Link href="/" className="hover:text-primary underline">
