@@ -18,11 +18,11 @@ function useLocalStorage<T>(key: string, initialValue: T): [T, (value: T | ((val
 
   const [storedValue, setStoredValue] = useState<T>(initialValue);
 
-  // Tämä efekti ajetaan vain client-puolella mountin jälkeen
+  // This effect runs only on the client-side after mount
   useEffect(() => {
     setStoredValue(readValue());
      // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [key]); // Added `key` to the dependency array
 
 
   const setValue = (value: T | ((val: T) => T)) => {
