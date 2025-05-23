@@ -12,6 +12,9 @@ interface OpponentArgumentDisplayProps {
   topic: string;
 }
 
+// This component might be deprecated or repurposed if DebateLogDisplay handles all AI responses.
+// For now, keeping it as a reference or for potential distinct display of a single AI counter.
+
 const OpponentArgumentDisplay: React.FC<OpponentArgumentDisplayProps> = ({
   opponentArgument,
   isLoading,
@@ -37,11 +40,11 @@ const OpponentArgumentDisplay: React.FC<OpponentArgumentDisplayProps> = ({
 
   if (!opponentArgument && !isLoading) {
     return (
-      <Card className="shadow-md border-dashed border-2">
+      <Card className="shadow-md border-dashed border-2 min-h-[150px] flex items-center justify-center">
         <CardContent className="p-6 text-center">
           <BrainCircuit className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
           <p className="text-muted-foreground">
-            {topic ? "The AI Opponent is ready for your challenge." : "Enter a topic and your argument first."}
+            {topic ? "Submit your argument to see the AI's response here." : "Enter a topic and your argument first."}
           </p>
         </CardContent>
       </Card>
@@ -66,7 +69,6 @@ const OpponentArgumentDisplay: React.FC<OpponentArgumentDisplayProps> = ({
           className="min-h-[150px] bg-secondary/30"
           aria-label="AI Opponent's Argument"
         />
-        {/* Future: Add button "Respond to Opponent" */}
       </CardContent>
     </Card>
   );

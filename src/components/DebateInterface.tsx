@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import type { DebateSession, ReasoningSkill, AnalyzeArgumentOutput, ResearchTopicOutput } from '@/types';
+import type { DebateSession, ReasoningSkill, AnalyzeArgumentOutput, ResearchTopicOutput, DebateTurn } from '@/types';
 import { generateArgument } from '@/ai/flows/generate-argument';
 import { analyzeArgument } from '@/ai/flows/real-time-feedback';
 import { generateCounterArgument } from '@/ai/flows/generate-counter-argument';
@@ -12,17 +12,17 @@ import { useToast } from '@/hooks/use-toast';
 
 import ArgumentAceLogo from './ArgumentAceLogo';
 import ArgumentGeneratorControls from './ArgumentGeneratorControls';
-import ArgumentDisplay from './ArgumentDisplay';
+import ArgumentDisplay from './ArgumentDisplay'; // For AI suggested argument
 import FeedbackDisplay from './FeedbackDisplay';
-import OpponentArgumentDisplay from './OpponentArgumentDisplay';
+// import OpponentArgumentDisplay from './OpponentArgumentDisplay'; // Replaced by DebateLogDisplay
+import DebateLogDisplay from './DebateLogDisplay';
 import ResearchAssistantDisplay from './ResearchAssistantDisplay';
 import PastSessionsDialog from './PastSessionsDialog';
 
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Separator } from '@/components/ui/separator';
-import { History, MessageSquareText, Save, Send, Loader2, Swords, Bot } from 'lucide-react';
+import { History, MessageSquareText, Save, Send, Loader2, Swords, Bot, Sparkles } from 'lucide-react';
 import { ScrollArea } from './ui/scroll-area';
 
 const SESSIONS_STORAGE_KEY = 'argumentAceSessions';
@@ -30,15 +30,16 @@ const SESSIONS_STORAGE_KEY = 'argumentAceSessions';
 const DebateInterface: React.FC = () => {
   const [topic, setTopic] = useState<string>('');
   const [reasoningSkill, setReasoningSkill] = useState<ReasoningSkill>('Intermediate');
-  const [generatedArgument, setGeneratedArgument] = useState<string | null>(null);
-  const [userArgument, setUserArgument] = useState<string>('');
+  const [generatedArgument, setGeneratedArgument] = useState<string | null>(null); // For "Generate AI Argument" feature
+  
+  const [userArgumentInput, setUserArgumentInput] = useState<string>(''); // Current text in textarea
+  const [debateLog, setDebateLog] = useState<DebateTurn[]>([]);
+  
   const [feedback, setFeedback] = useState<AnalyzeArgumentOutput | null>(null);
-  const [aiOpponentArgument, setAiOpponentArgument] = useState<string | null>(null);
   const [researchPoints, setResearchPoints] = useState<string[] | null>(null);
 
-  const [isLoadingArgument, setIsLoadingArgument] = useState<boolean>(false);
-  const [isLoadingFeedback, setIsLoadingFeedback] = useState<boolean>(false);
-  const [isLoadingAiOpponent, setIsLoadingAiOpponent] = useState<boolean>(false);
+  const [isLoadingAiSuggestedArgument, setIsLoadingAiSuggestedArgument] = useState<boolean>(false);
+  const [isLoadingFeedbackAndAiTurn, setIsLoadingFeedbackAndAiTurn] = useState<boolean>(false);
   const [isLoadingResearch, setIsLoadingResearch] = useState<boolean>(false);
 
   const [sessions, setSessions] = useLocalStorage<DebateSession[]>(SESSIONS_STORAGE_KEY, []);
@@ -46,24 +47,22 @@ const DebateInterface: React.FC = () => {
 
   const { toast } = useToast();
 
-  const handleGenerateArgument = async () => {
+  // Handles "Generate AI Argument" button (suggestion for user)
+  const handleGenerateAiSuggestion = async () => {
     if (!topic.trim()) {
       toast({ title: "Topic Required", description: "Please enter a debate topic.", variant: "destructive" });
       return;
     }
-    setIsLoadingArgument(true);
+    setIsLoadingAiSuggestedArgument(true);
     setGeneratedArgument(null);
-    setAiOpponentArgument(null); 
-    setFeedback(null); 
-    // setUserArgument(''); // Optionally clear user argument too
     try {
       const result = await generateArgument({ topic, reasoningSkill });
       setGeneratedArgument(result.argument);
     } catch (error) {
-      console.error("Error generating argument:", error);
-      toast({ title: "Error Generating Argument", description: "Failed to generate argument. Please try again.", variant: "destructive" });
+      console.error("Error generating AI suggested argument:", error);
+      toast({ title: "Error Generating Suggestion", description: "Failed to generate argument suggestion. Please try again.", variant: "destructive" });
     } finally {
-      setIsLoadingArgument(false);
+      setIsLoadingAiSuggestedArgument(false);
     }
   };
 
@@ -85,103 +84,98 @@ const DebateInterface: React.FC = () => {
     }
   };
 
-  const handleGetFeedback = async () => {
-    if (!userArgument.trim()) {
+  const handleSubmitUserTurn = async () => {
+    if (!userArgumentInput.trim()) {
       toast({ title: "Argument Required", description: "Please enter your argument.", variant: "destructive" });
       return;
     }
     if (!topic.trim()) {
-      toast({ title: "Topic Required", description: "Please enter a debate topic for context.", variant: "destructive" });
+      toast({ title: "Topic Required", description: "Please ensure a debate topic is set.", variant: "destructive" });
       return;
     }
-    setIsLoadingFeedback(true);
-    setFeedback(null);
-    setAiOpponentArgument(null);
-    try {
-      const result = await analyzeArgument({ argument: userArgument, topic });
-      setFeedback(result);
-    } catch (error) {
-      console.error("Error getting feedback:", error);
-      toast({ title: "Error Getting Feedback", description: "Failed to get feedback. Please try again.", variant: "destructive" });
-    } finally {
-      setIsLoadingFeedback(false);
-    }
-  };
 
-  const handleGetAiOpponentArgument = async () => {
-    if (!userArgument.trim()) {
-      toast({ title: "Your Argument Required", description: "Please provide your argument before challenging the AI.", variant: "destructive" });
-      return;
-    }
-    if (!topic.trim()) {
-      toast({ title: "Topic Required", description: "A debate topic is needed for the AI opponent.", variant: "destructive" });
-      return;
-    }
-    setIsLoadingAiOpponent(true);
-    setAiOpponentArgument(null);
+    setIsLoadingFeedbackAndAiTurn(true);
+    setFeedback(null);
+
+    const newUserTurn: DebateTurn = { speaker: 'user', text: userArgumentInput, timestamp: new Date().toISOString() };
+    const updatedDebateLog = [...debateLog, newUserTurn];
+    setDebateLog(updatedDebateLog);
+    setUserArgumentInput(''); // Clear input for next turn
+
     try {
-      const result = await generateCounterArgument({
+      // 1. Get feedback for the user's current turn
+      const feedbackResult = await analyzeArgument({ argument: newUserTurn.text, topic });
+      setFeedback(feedbackResult);
+
+      // 2. Get AI opponent's counter-argument
+      const formattedHistory = updatedDebateLog
+        .map(turn => `${turn.speaker === 'user' ? 'User' : 'AI'}: "${turn.text}"`)
+        .join('\n');
+      
+      const aiCounterResult = await generateCounterArgument({
         topic,
-        userArgument,
+        formattedDebateHistory: formattedHistory,
         opponentSkill: reasoningSkill
       });
-      setAiOpponentArgument(result.counterArgument);
+      
+      const newAiTurn: DebateTurn = { speaker: 'ai', text: aiCounterResult.counterArgument, timestamp: new Date().toISOString() };
+      setDebateLog(prevLog => [...prevLog, newAiTurn]);
+
     } catch (error) {
-      console.error("Error generating AI opponent argument:", error);
-      toast({ title: "Error Challenging AI", description: "Failed to get AI opponent's argument. Please try again.", variant: "destructive" });
+      console.error("Error processing turn:", error);
+      toast({ title: "Error Processing Turn", description: "Failed to get feedback or AI response. Please try again.", variant: "destructive" });
+      // Optionally, remove user's turn from log if AI part fails critically, or allow retry
     } finally {
-      setIsLoadingAiOpponent(false);
+      setIsLoadingFeedbackAndAiTurn(false);
     }
   };
 
-  const handleUseArgument = (argument: string) => {
-    setUserArgument(argument);
-    setFeedback(null); 
-    setAiOpponentArgument(null); 
-    toast({ title: "Argument Loaded", description: "AI argument loaded into your text area for editing." });
+  const handleUseAiSuggestedArgument = (argument: string) => {
+    setUserArgumentInput(argument); // Load into main input area
+    setGeneratedArgument(null); // Clear the suggestion box
+    toast({ title: "Argument Loaded", description: "AI suggested argument loaded for your turn." });
   };
 
-  const handleClearGeneratedArgument = () => {
+  const handleClearAiSuggestedArgument = () => {
     setGeneratedArgument(null);
   };
   
-  // Effect to clear research points if topic changes
   useEffect(() => {
+    // Reset relevant states when topic changes
     setResearchPoints(null);
-    setGeneratedArgument(null);
+    setGeneratedArgument(null); // AI suggestion
     setFeedback(null);
-    setAiOpponentArgument(null);
-    // setUserArgument(''); // Decide if user argument should also clear
+    setDebateLog([]);
+    setUserArgumentInput('');
   }, [topic]);
 
 
   const handleSaveSession = () => {
-    if (!topic.trim() && !userArgument.trim()) {
-      toast({ title: "Nothing to Save", description: "Please enter a topic or argument before saving.", variant: "destructive" });
+    if (!topic.trim() && debateLog.length === 0) {
+      toast({ title: "Nothing to Save", description: "Please enter a topic or start the debate before saving.", variant: "destructive" });
       return;
     }
     const newSession: DebateSession = {
       id: Date.now().toString(),
       topic,
-      userArgument,
-      generatedArgument: generatedArgument ?? undefined,
-      feedback: feedback ?? undefined,
-      aiOpponentArgument: aiOpponentArgument ?? undefined,
+      debateLog,
+      feedback: feedback ?? undefined, // Feedback for the last user turn
       researchPoints: researchPoints ?? undefined,
       timestamp: new Date().toISOString(),
+      reasoningSkill,
     };
-    setSessions([...sessions, newSession]);
+    setSessions(prevSessions => [newSession, ...prevSessions.sort((a,b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())]);
     toast({ title: "Session Saved!", description: "Your current debate session has been saved." });
   };
 
   const handleLoadSession = (session: DebateSession) => {
     setTopic(session.topic);
-    setUserArgument(session.userArgument);
-    setGeneratedArgument(session.generatedArgument || null);
+    setDebateLog(session.debateLog);
     setFeedback(session.feedback || null);
-    setAiOpponentArgument(session.aiOpponentArgument || null);
     setResearchPoints(session.researchPoints || null);
-    setReasoningSkill('Intermediate'); // Reset or load from session if stored
+    setReasoningSkill(session.reasoningSkill || 'Intermediate');
+    setUserArgumentInput(''); // Clear current input
+    setGeneratedArgument(null); // Clear AI suggestion
     toast({ title: "Session Loaded", description: `Session for topic "${session.topic}" has been loaded.` });
   };
 
@@ -194,13 +188,15 @@ const DebateInterface: React.FC = () => {
     setSessions([]);
     toast({ title: "All Sessions Deleted", description: "All saved sessions have been deleted." });
   };
+  
+  const userLastTurnText = debateLog.filter(t => t.speaker === 'user').pop()?.text || "";
 
   return (
     <div className="min-h-screen flex flex-col p-4 md:p-6 bg-background">
       <header className="flex flex-col sm:flex-row justify-between items-center mb-6 pb-4 border-b">
         <ArgumentAceLogo />
         <div className="flex gap-2 mt-4 sm:mt-0">
-          <Button variant="outline" onClick={handleSaveSession} disabled={!topic && !userArgument}>
+          <Button variant="outline" onClick={handleSaveSession} disabled={(!topic && debateLog.length === 0) || isLoadingFeedbackAndAiTurn}>
             <Save className="mr-2 h-4 w-4" /> Save Session
           </Button>
           <Button variant="outline" onClick={() => setIsPastSessionsDialogOpen(true)}>
@@ -218,18 +214,19 @@ const DebateInterface: React.FC = () => {
               setTopic={setTopic}
               reasoningSkill={reasoningSkill}
               setReasoningSkill={setReasoningSkill}
-              onGenerateArgument={handleGenerateArgument}
+              onGenerateArgument={handleGenerateAiSuggestion} // This is for "Suggest an argument for me"
               onResearchTopic={handleResearchTopic}
-              isLoadingArgument={isLoadingArgument}
+              isLoadingArgument={isLoadingAiSuggestedArgument}
               isLoadingResearch={isLoadingResearch}
             />
 
+            {/* Display for AI Suggested Argument (for user to use) */}
             <ArgumentDisplay
               generatedArgument={generatedArgument}
-              isLoading={isLoadingArgument}
-              onUseArgument={handleUseArgument}
-              onRegenerate={handleGenerateArgument}
-              onClearArgument={handleClearGeneratedArgument}
+              isLoading={isLoadingAiSuggestedArgument}
+              onUseArgument={handleUseAiSuggestedArgument}
+              onRegenerate={handleGenerateAiSuggestion}
+              onClearArgument={handleClearAiSuggestedArgument}
               topic={topic}
             />
 
@@ -237,31 +234,33 @@ const DebateInterface: React.FC = () => {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <MessageSquareText className="h-6 w-6 text-primary" />
-                  Your Argument
+                  {debateLog.length > 0 ? "Your Next Argument / Rebuttal" : "Your Opening Argument"}
                 </CardTitle>
                 <CardDescription>
-                  Enter your argument here, or use and edit the AI-generated one.
+                  {debateLog.length > 0 
+                    ? "Respond to the AI or make your next point." 
+                    : "Enter your opening argument here, or use an AI suggestion."}
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <Textarea
-                  placeholder="Type or paste your argument here..."
-                  value={userArgument}
-                  onChange={(e) => {
-                    setUserArgument(e.target.value);
-                    setFeedback(null); 
-                    setAiOpponentArgument(null);
-                  }}
+                  placeholder="Type your argument here..."
+                  value={userArgumentInput}
+                  onChange={(e) => setUserArgumentInput(e.target.value)}
                   className="min-h-[200px] text-base"
                   aria-label="Your Argument Input"
                 />
-                <Button onClick={handleGetFeedback} disabled={isLoadingFeedback || !userArgument.trim() || !topic.trim()} className="mt-4 w-full">
-                  {isLoadingFeedback ? (
+                <Button 
+                  onClick={handleSubmitUserTurn} 
+                  disabled={isLoadingFeedbackAndAiTurn || !userArgumentInput.trim() || !topic.trim()} 
+                  className="mt-4 w-full"
+                >
+                  {isLoadingFeedbackAndAiTurn ? (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   ) : (
                     <Send className="mr-2 h-4 w-4" />
                   )}
-                  Get Feedback
+                  {debateLog.length > 0 ? "Send Rebuttal & Get AI Response" : "Submit Argument & Get AI Response"}
                 </Button>
               </CardContent>
             </Card>
@@ -276,38 +275,19 @@ const DebateInterface: React.FC = () => {
               isLoading={isLoadingResearch}
               topic={topic}
             />
-            <FeedbackDisplay feedback={feedback} isLoading={isLoadingFeedback} />
+            
+            <DebateLogDisplay 
+              debateLog={debateLog}
+              topic={topic}
+              isLoadingAiResponse={isLoadingFeedbackAndAiTurn && userArgumentInput === ''} // Show loading in log if AI is "typing"
+            />
 
-            {topic && userArgument && (
-              <Card className="shadow-lg">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Bot className="h-6 w-6 text-accent" />
-                    AI Opponent
-                  </CardTitle>
-                  {!aiOpponentArgument && !isLoadingAiOpponent && (
-                    <CardDescription>Challenge the AI to a counter-argument.</CardDescription>
-                  )}
-                </CardHeader>
-                <CardContent>
-                  {!aiOpponentArgument && !isLoadingAiOpponent && (
-                    <Button onClick={handleGetAiOpponentArgument} disabled={isLoadingAiOpponent || !userArgument.trim() || !topic.trim()} className="w-full">
-                      {isLoadingAiOpponent ? (
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      ) : (
-                        <Swords className="mr-2 h-4 w-4" />
-                      )}
-                      Challenge AI Opponent
-                    </Button>
-                  )}
-                  <OpponentArgumentDisplay
-                    opponentArgument={aiOpponentArgument}
-                    isLoading={isLoadingAiOpponent}
-                    topic={topic}
-                  />
-                </CardContent>
-              </Card>
-            )}
+            <FeedbackDisplay 
+                feedback={feedback} 
+                isLoading={isLoadingFeedbackAndAiTurn && userArgumentInput !== '' && userLastTurnText !== ''} // Show loading feedback if processing user's submitted text
+                // Pass the user's last argument text to FeedbackDisplay if it needs it for context, or ensure feedback object contains it
+            />
+            
           </div>
         </ScrollArea>
       </main>

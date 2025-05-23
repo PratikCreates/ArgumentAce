@@ -1,11 +1,11 @@
 
 "use client";
 
-import type { DebateSession } from '@/types';
+import type { DebateSession, DebateTurn } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Trash2, Eye, AlertCircle, BookOpen, Bot } from 'lucide-react';
+import { Trash2, Eye, AlertCircle, BookOpen, Bot, Users } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 
@@ -36,7 +36,8 @@ const PastSessionsDialog: React.FC<PastSessionsDialogProps> = ({
         {sessions.length > 0 ? (
           <ScrollArea className="h-[450px] pr-4">
             <div className="space-y-3">
-              {sessions.sort((a,b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()).map((session) => (
+              {/* Ensure sessions are sorted with the newest first if not already */}
+              {sessions.map((session) => (
                 <div key={session.id} className="p-3 border rounded-lg hover:bg-muted/50 transition-colors">
                   <div className="flex items-start justify-between">
                     <div className="flex-grow">
@@ -68,27 +69,27 @@ const PastSessionsDialog: React.FC<PastSessionsDialogProps> = ({
                     </div>
                   </div>
                   <div className="mt-2 flex flex-wrap gap-2 items-center">
+                    {session.debateLog && session.debateLog.length > 0 && (
+                       <Badge variant="outline" className="text-xs">
+                        <Users className="h-3 w-3 mr-1" />
+                        {session.debateLog.filter(t => t.speaker === 'user').length} User Turn{session.debateLog.filter(t => t.speaker === 'user').length === 1 ? '' : 's'}
+                      </Badge>
+                    )}
                     {session.feedback && session.feedback.fallacies && session.feedback.fallacies.length > 0 && (
                       <Badge variant="destructive" className="text-xs">
                         <AlertCircle className="h-3 w-3 mr-1" />
-                        {session.feedback.fallacies.length} Fallac{session.feedback.fallacies.length === 1 ? 'y' : 'ies'}
+                        {session.feedback.fallacies.length} Fallac{session.feedback.fallacies.length === 1 ? 'y' : 'ies'} (last turn)
                       </Badge>
                     )}
                      {session.feedback && session.feedback.fallacies && session.feedback.fallacies.length === 0 && (
                       <Badge variant="secondary" className="text-xs bg-green-100 text-green-700 border-green-300">
-                        No Fallacies
+                        No Fallacies (last turn)
                       </Badge>
                     )}
                     {session.researchPoints && session.researchPoints.length > 0 && (
                       <Badge variant="outline" className="text-xs">
                         <BookOpen className="h-3 w-3 mr-1" />
                         Researched
-                      </Badge>
-                    )}
-                    {session.aiOpponentArgument && (
-                      <Badge variant="outline" className="text-xs">
-                        <Bot className="h-3 w-3 mr-1" />
-                        AI Countered
                       </Badge>
                     )}
                   </div>
@@ -105,8 +106,6 @@ const PastSessionsDialog: React.FC<PastSessionsDialogProps> = ({
            {sessions.length > 0 && (
              <Button variant="destructive" onClick={() => {
                 onDeleteAllSessions();
-                // Optionally close dialog if you want, or let user close manually
-                // setIsOpen(false); 
              }} className="w-full sm:w-auto">
                 <Trash2 className="mr-2 h-4 w-4" /> Delete All Sessions
              </Button>
@@ -123,4 +122,3 @@ const PastSessionsDialog: React.FC<PastSessionsDialogProps> = ({
 };
 
 export default PastSessionsDialog;
-
