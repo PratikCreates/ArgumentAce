@@ -22,6 +22,18 @@ export default function Home() {
     <div>
       <header className="py-4 px-6 bg-card shadow-sm sticky top-0 z-50 flex justify-between items-center">
         <ArgumentAceLogo />
+        <div className="flex items-center space-x-4">
+          <Button
+            variant="outline"
+            onClick={handleDownloadPdfClick}
+            disabled={isDownloadingPdf}
+          >
+            {isDownloadingPdf ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (<Download className="mr-2 h-4 w-4" />)}
+            Download as PDF      
+          </Button>
+      </div>
       </header>
       <div ref={contentRef}> {/* Attach ref to the content container */}
         <DebateInterface />
