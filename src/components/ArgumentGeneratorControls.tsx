@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Brain, Sparkles, Lightbulb, Loader2 } from 'lucide-react';
+import { Brain, Sparkles, Lightbulb, Loader2, BookOpenCheck } from 'lucide-react';
 import { useState } from 'react';
 import { suggestTopics, SuggestTopicsOutput } from '@/ai/flows/suggest-topics-flow';
 import { useToast } from '@/hooks/use-toast';
@@ -17,8 +17,10 @@ interface ArgumentGeneratorControlsProps {
   setTopic: (topic: string) => void;
   reasoningSkill: ReasoningSkill;
   setReasoningSkill: (skill: ReasoningSkill) => void;
-  onGenerate: () => void;
-  isLoading: boolean;
+  onGenerateArgument: () => void;
+  onResearchTopic: () => void;
+  isLoadingArgument: boolean;
+  isLoadingResearch: boolean;
 }
 
 const ArgumentGeneratorControls: React.FC<ArgumentGeneratorControlsProps> = ({
@@ -26,8 +28,10 @@ const ArgumentGeneratorControls: React.FC<ArgumentGeneratorControlsProps> = ({
   setTopic,
   reasoningSkill,
   setReasoningSkill,
-  onGenerate,
-  isLoading,
+  onGenerateArgument,
+  onResearchTopic,
+  isLoadingArgument,
+  isLoadingResearch,
 }) => {
   const [isSuggestingTopics, setIsSuggestingTopics] = useState(false);
   const [suggestedTopics, setSuggestedTopics] = useState<string[]>([]);
@@ -77,7 +81,7 @@ const ArgumentGeneratorControls: React.FC<ArgumentGeneratorControlsProps> = ({
             <Button
               variant="outline"
               onClick={handleSuggestTopics}
-              disabled={isSuggestingTopics}
+              disabled={isSuggestingTopics || isLoadingArgument || isLoadingResearch}
               title="Suggest Topics"
               size="icon"
             >
@@ -125,14 +129,24 @@ const ArgumentGeneratorControls: React.FC<ArgumentGeneratorControlsProps> = ({
             </SelectContent>
           </Select>
         </div>
-        <Button onClick={onGenerate} disabled={isLoading || !topic} className="w-full">
-          {isLoading ? (
-            <Sparkles className="mr-2 h-4 w-4 animate-spin" />
-          ) : (
-            <Sparkles className="mr-2 h-4 w-4" />
-          )}
-          Generate AI Argument
-        </Button>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <Button onClick={onResearchTopic} disabled={isLoadingResearch || !topic || isLoadingArgument} variant="outline">
+            {isLoadingResearch ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <BookOpenCheck className="mr-2 h-4 w-4" />
+            )}
+            Research Topic
+          </Button>
+          <Button onClick={onGenerateArgument} disabled={isLoadingArgument || !topic || isLoadingResearch}>
+            {isLoadingArgument ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Sparkles className="mr-2 h-4 w-4" />
+            )}
+            Generate AI Argument
+          </Button>
+        </div>
       </CardContent>
     </Card>
   );

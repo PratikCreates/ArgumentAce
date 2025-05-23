@@ -2,10 +2,11 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import type { DebateSession, ReasoningSkill, AnalyzeArgumentOutput } from '@/types';
+import type { DebateSession, ReasoningSkill, AnalyzeArgumentOutput, ResearchTopicOutput } from '@/types';
 import { generateArgument } from '@/ai/flows/generate-argument';
 import { analyzeArgument } from '@/ai/flows/real-time-feedback';
 import { generateCounterArgument } from '@/ai/flows/generate-counter-argument';
+import { researchTopic } from '@/ai/flows/research-topic-flow';
 import useLocalStorage from '@/hooks/useLocalStorage';
 import { useToast } from '@/hooks/use-toast';
 
@@ -14,6 +15,7 @@ import ArgumentGeneratorControls from './ArgumentGeneratorControls';
 import ArgumentDisplay from './ArgumentDisplay';
 import FeedbackDisplay from './FeedbackDisplay';
 import OpponentArgumentDisplay from './OpponentArgumentDisplay';
+import ResearchAssistantDisplay from './ResearchAssistantDisplay';
 import PastSessionsDialog from './PastSessionsDialog';
 
 import { Button } from '@/components/ui/button';
@@ -32,10 +34,12 @@ const DebateInterface: React.FC = () => {
   const [userArgument, setUserArgument] = useState<string>('');
   const [feedback, setFeedback] = useState<AnalyzeArgumentOutput | null>(null);
   const [aiOpponentArgument, setAiOpponentArgument] = useState<string | null>(null);
+  const [researchPoints, setResearchPoints] = useState<string[] | null>(null);
 
   const [isLoadingArgument, setIsLoadingArgument] = useState<boolean>(false);
   const [isLoadingFeedback, setIsLoadingFeedback] = useState<boolean>(false);
   const [isLoadingAiOpponent, setIsLoadingAiOpponent] = useState<boolean>(false);
+  const [isLoadingResearch, setIsLoadingResearch] = useState<boolean>(false);
 
   const [sessions, setSessions] = useLocalStorage<DebateSession[]>(SESSIONS_STORAGE_KEY, []);
   const [isPastSessionsDialogOpen, setIsPastSessionsDialogOpen] = useState<boolean>(false);
@@ -48,9 +52,10 @@ const DebateInterface: React.FC = () => {
       return;
     }
     setIsLoadingArgument(true);
-    setGeneratedArgument(null); 
-    setAiOpponentArgument(null); // Clear opponent argument when generating new base argument
-    setFeedback(null); // Clear feedback
+    setGeneratedArgument(null);
+    setAiOpponentArgument(null); 
+    setFeedback(null); 
+    // setUserArgument(''); // Optionally clear user argument too
     try {
       const result = await generateArgument({ topic, reasoningSkill });
       setGeneratedArgument(result.argument);
@@ -59,6 +64,24 @@ const DebateInterface: React.FC = () => {
       toast({ title: "Error Generating Argument", description: "Failed to generate argument. Please try again.", variant: "destructive" });
     } finally {
       setIsLoadingArgument(false);
+    }
+  };
+
+  const handleResearchTopic = async () => {
+    if (!topic.trim()) {
+      toast({ title: "Topic Required", description: "Please enter a debate topic to research.", variant: "destructive" });
+      return;
+    }
+    setIsLoadingResearch(true);
+    setResearchPoints(null);
+    try {
+      const result: ResearchTopicOutput = await researchTopic({ topic });
+      setResearchPoints(result.researchPoints);
+    } catch (error) {
+      console.error("Error researching topic:", error);
+      toast({ title: "Error Researching Topic", description: "Failed to get research points. Please try again.", variant: "destructive" });
+    } finally {
+      setIsLoadingResearch(false);
     }
   };
 
@@ -72,8 +95,8 @@ const DebateInterface: React.FC = () => {
       return;
     }
     setIsLoadingFeedback(true);
-    setFeedback(null); 
-    setAiOpponentArgument(null); // Clear opponent argument when getting new feedback for user's argument
+    setFeedback(null);
+    setAiOpponentArgument(null);
     try {
       const result = await analyzeArgument({ argument: userArgument, topic });
       setFeedback(result);
@@ -84,7 +107,7 @@ const DebateInterface: React.FC = () => {
       setIsLoadingFeedback(false);
     }
   };
-  
+
   const handleGetAiOpponentArgument = async () => {
     if (!userArgument.trim()) {
       toast({ title: "Your Argument Required", description: "Please provide your argument before challenging the AI.", variant: "destructive" });
@@ -97,14 +120,13 @@ const DebateInterface: React.FC = () => {
     setIsLoadingAiOpponent(true);
     setAiOpponentArgument(null);
     try {
-      const result = await generateCounterArgument({ 
-        topic, 
-        userArgument, 
-        opponentSkill: reasoningSkill // Using the same skill level for simplicity
+      const result = await generateCounterArgument({
+        topic,
+        userArgument,
+        opponentSkill: reasoningSkill
       });
       setAiOpponentArgument(result.counterArgument);
-    } catch (error)
-    {
+    } catch (error) {
       console.error("Error generating AI opponent argument:", error);
       toast({ title: "Error Challenging AI", description: "Failed to get AI opponent's argument. Please try again.", variant: "destructive" });
     } finally {
@@ -112,22 +134,31 @@ const DebateInterface: React.FC = () => {
     }
   };
 
-
   const handleUseArgument = (argument: string) => {
     setUserArgument(argument);
-    setFeedback(null); // Clear feedback if user changes argument
-    setAiOpponentArgument(null); // Clear opponent argument
+    setFeedback(null); 
+    setAiOpponentArgument(null); 
     toast({ title: "Argument Loaded", description: "AI argument loaded into your text area for editing." });
   };
 
   const handleClearGeneratedArgument = () => {
     setGeneratedArgument(null);
-  }
+  };
+  
+  // Effect to clear research points if topic changes
+  useEffect(() => {
+    setResearchPoints(null);
+    setGeneratedArgument(null);
+    setFeedback(null);
+    setAiOpponentArgument(null);
+    // setUserArgument(''); // Decide if user argument should also clear
+  }, [topic]);
+
 
   const handleSaveSession = () => {
     if (!topic.trim() && !userArgument.trim()) {
-        toast({ title: "Nothing to Save", description: "Please enter a topic or argument before saving.", variant: "destructive"});
-        return;
+      toast({ title: "Nothing to Save", description: "Please enter a topic or argument before saving.", variant: "destructive" });
+      return;
     }
     const newSession: DebateSession = {
       id: Date.now().toString(),
@@ -136,6 +167,7 @@ const DebateInterface: React.FC = () => {
       generatedArgument: generatedArgument ?? undefined,
       feedback: feedback ?? undefined,
       aiOpponentArgument: aiOpponentArgument ?? undefined,
+      researchPoints: researchPoints ?? undefined,
       timestamp: new Date().toISOString(),
     };
     setSessions([...sessions, newSession]);
@@ -148,6 +180,7 @@ const DebateInterface: React.FC = () => {
     setGeneratedArgument(session.generatedArgument || null);
     setFeedback(session.feedback || null);
     setAiOpponentArgument(session.aiOpponentArgument || null);
+    setResearchPoints(session.researchPoints || null);
     setReasoningSkill('Intermediate'); // Reset or load from session if stored
     toast({ title: "Session Loaded", description: `Session for topic "${session.topic}" has been loaded.` });
   };
@@ -160,7 +193,7 @@ const DebateInterface: React.FC = () => {
   const handleDeleteAllSessions = () => {
     setSessions([]);
     toast({ title: "All Sessions Deleted", description: "All saved sessions have been deleted." });
-  }
+  };
 
   return (
     <div className="min-h-screen flex flex-col p-4 md:p-6 bg-background">
@@ -179,65 +212,72 @@ const DebateInterface: React.FC = () => {
       <main className="flex-grow grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Left Panel */}
         <ScrollArea className="h-[calc(100vh-150px)] md:h-auto">
-        <div className="space-y-6 pr-3">
-          <ArgumentGeneratorControls
-            topic={topic}
-            setTopic={setTopic}
-            reasoningSkill={reasoningSkill}
-            setReasoningSkill={setReasoningSkill}
-            onGenerate={handleGenerateArgument}
-            isLoading={isLoadingArgument}
-          />
+          <div className="space-y-6 pr-3">
+            <ArgumentGeneratorControls
+              topic={topic}
+              setTopic={setTopic}
+              reasoningSkill={reasoningSkill}
+              setReasoningSkill={setReasoningSkill}
+              onGenerateArgument={handleGenerateArgument}
+              onResearchTopic={handleResearchTopic}
+              isLoadingArgument={isLoadingArgument}
+              isLoadingResearch={isLoadingResearch}
+            />
 
-          <ArgumentDisplay
-            generatedArgument={generatedArgument}
-            isLoading={isLoadingArgument}
-            onUseArgument={handleUseArgument}
-            onRegenerate={handleGenerateArgument}
-            onClearArgument={handleClearGeneratedArgument}
-            topic={topic}
-          />
-          
-          <Card className="shadow-lg">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <MessageSquareText className="h-6 w-6 text-primary" />
-                Your Argument
-              </CardTitle>
-              <CardDescription>
-                Enter your argument here, or use and edit the AI-generated one.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Textarea
-                placeholder="Type or paste your argument here..."
-                value={userArgument}
-                onChange={(e) => {
-                  setUserArgument(e.target.value);
-                  setFeedback(null); // Clear feedback if user edits argument
-                  setAiOpponentArgument(null); // Clear opponent argument
-                }}
-                className="min-h-[200px] text-base"
-                aria-label="Your Argument Input"
-              />
-              <Button onClick={handleGetFeedback} disabled={isLoadingFeedback || !userArgument.trim() || !topic.trim()} className="mt-4 w-full">
-                {isLoadingFeedback ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <Send className="mr-2 h-4 w-4" />
-                )}
-                Get Feedback
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
+            <ArgumentDisplay
+              generatedArgument={generatedArgument}
+              isLoading={isLoadingArgument}
+              onUseArgument={handleUseArgument}
+              onRegenerate={handleGenerateArgument}
+              onClearArgument={handleClearGeneratedArgument}
+              topic={topic}
+            />
+
+            <Card className="shadow-lg">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <MessageSquareText className="h-6 w-6 text-primary" />
+                  Your Argument
+                </CardTitle>
+                <CardDescription>
+                  Enter your argument here, or use and edit the AI-generated one.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Textarea
+                  placeholder="Type or paste your argument here..."
+                  value={userArgument}
+                  onChange={(e) => {
+                    setUserArgument(e.target.value);
+                    setFeedback(null); 
+                    setAiOpponentArgument(null);
+                  }}
+                  className="min-h-[200px] text-base"
+                  aria-label="Your Argument Input"
+                />
+                <Button onClick={handleGetFeedback} disabled={isLoadingFeedback || !userArgument.trim() || !topic.trim()} className="mt-4 w-full">
+                  {isLoadingFeedback ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Send className="mr-2 h-4 w-4" />
+                  )}
+                  Get Feedback
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
         </ScrollArea>
 
         {/* Right Panel */}
         <ScrollArea className="h-[calc(100vh-150px)] md:h-auto">
           <div className="space-y-6 md:sticky md:top-6 pr-1">
+            <ResearchAssistantDisplay 
+              researchPoints={researchPoints}
+              isLoading={isLoadingResearch}
+              topic={topic}
+            />
             <FeedbackDisplay feedback={feedback} isLoading={isLoadingFeedback} />
-            
+
             {topic && userArgument && (
               <Card className="shadow-lg">
                 <CardHeader>
