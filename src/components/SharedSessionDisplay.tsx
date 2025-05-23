@@ -8,12 +8,14 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { User, Bot, ListChecks, Gavel, Scale, Lightbulb, AlertTriangle, Award, Star, Sparkles, Smile, Frown } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from './ui/badge';
+import { cn } from '@/lib/utils';
 
 interface SharedSessionDisplayProps {
   session: DebateSession;
+  isPdfCapturePhase?: boolean; // New prop
 }
 
-const SharedSessionDisplay: React.FC<SharedSessionDisplayProps> = ({ session }) => {
+const SharedSessionDisplay: React.FC<SharedSessionDisplayProps> = ({ session, isPdfCapturePhase }) => {
 
   const renderStrengthsWeaknesses = (items: string[] | undefined, type: 'strength' | 'weakness') => {
     if (!items || items.length === 0) {
@@ -34,8 +36,21 @@ const SharedSessionDisplay: React.FC<SharedSessionDisplayProps> = ({ session }) 
     );
   };
 
+  // Conditional class for ScrollArea based on PDF capture phase
+  const scrollAreaClass = cn(
+    "w-full pr-4",
+    isPdfCapturePhase 
+      ? "h-auto overflow-visible" 
+      : "h-[400px] md:h-[600px]"
+  );
+  
+  const scrollAreaViewportClass = cn(
+    isPdfCapturePhase ? "overflow-visible" : ""
+  );
+
+
   return (
-    <div className="container mx-auto py-8 px-4 space-y-6">
+    <div className={cn("container mx-auto py-8 px-4 space-y-6", isPdfCapturePhase ? "bg-white" : "")}> {/* Ensure background for PDF if needed */}
       <Card className="shadow-xl">
         <CardHeader className="border-b">
           <CardTitle className="text-3xl font-bold text-primary">{session.topic}</CardTitle>
@@ -123,8 +138,10 @@ const SharedSessionDisplay: React.FC<SharedSessionDisplayProps> = ({ session }) 
           <CardTitle  className="text-2xl">Debate Log</CardTitle>
         </CardHeader>
         <CardContent>
-          <ScrollArea className="h-[400px] md:h-[600px] w-full pr-4">
-            <div className="space-y-4">
+           {/* Apply conditional class to ScrollArea */}
+          <ScrollArea className={scrollAreaClass}>
+             {/* It might also be necessary to ensure the viewport itself allows content to overflow if not wrapped by ScrollArea's fixed height */}
+            <div className={cn("space-y-4", scrollAreaViewportClass)}>
               {session.debateLog.map((turn, index) => (
                 <div
                   key={index}
