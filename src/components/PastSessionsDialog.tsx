@@ -5,14 +5,14 @@ import type { DebateSession } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Trash2, Eye, AlertCircle, BookOpen, Users, Gavel, Share2, Copy, Check, Link as LinkIcon } from 'lucide-react'; // Changed Link to LinkIcon
+import { Trash2, Eye, AlertCircle, BookOpen, Users, Gavel, Share2, Copy, Check, Link as LinkIcon, Loader2 } from 'lucide-react'; // Changed Link to LinkIcon, Added Loader2
 import { formatDistanceToNow } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import { publishSession } from '@/services/sharingService';
 import { useToast } from '@/hooks/use-toast';
 import { useState } from 'react';
 import { Input } from './ui/input';
-import { cn } from "@/lib/utils"; // Added missing import
+import { cn } from "@/lib/utils";
 
 interface PastSessionsDialogProps {
   isOpen: boolean;
@@ -41,7 +41,7 @@ const PastSessionsDialog: React.FC<PastSessionsDialogProps> = ({
     setIsSharing(session.id);
     try {
       const { shareId, publicUrl } = await publishSession({
-        localId: session.id, // pass local id for reference if needed by stub
+        localId: session.id,
         topic: session.topic,
         debateLog: session.debateLog,
         feedback: session.feedback,
@@ -52,18 +52,27 @@ const PastSessionsDialog: React.FC<PastSessionsDialogProps> = ({
       });
       const updatedSession = { ...session, shareId, isPublic: true, publicUrl };
       onUpdateSession(updatedSession);
+
+      let copySuccess = false;
+      try {
+        await navigator.clipboard.writeText(publicUrl);
+        setCopiedLinkId(shareId);
+        copySuccess = true;
+        setTimeout(() => setCopiedLinkId(null), 2000);
+      } catch (copyError) {
+        console.error("Failed to copy link to clipboard:", copyError);
+      }
+
       toast({
         title: "Session Shared!",
         description: (
           <div>
-            <p>Your session is now public. Link copied to clipboard!</p>
+            <p>Your session is now public. {copySuccess ? "Link copied to clipboard!" : "Please copy the link manually."}</p>
             <Input readOnly value={publicUrl} className="mt-2 text-xs" />
           </div>
         ),
       });
-      navigator.clipboard.writeText(publicUrl);
-      setCopiedLinkId(shareId);
-      setTimeout(() => setCopiedLinkId(null), 2000);
+
     } catch (error) {
       console.error("Error sharing session:", error);
       toast({ title: "Sharing Failed", description: "Could not share the session. Please try again.", variant: "destructive" });
@@ -72,15 +81,21 @@ const PastSessionsDialog: React.FC<PastSessionsDialogProps> = ({
     }
   };
 
-  const handleCopyLink = (publicUrl: string, shareId: string) => {
-    navigator.clipboard.writeText(publicUrl);
-    setCopiedLinkId(shareId);
-    toast({ title: "Link Copied!"});
-    setTimeout(() => setCopiedLinkId(null), 2000);
+  const handleCopyLink = async (publicUrl: string, shareId: string) => {
+    try {
+      await navigator.clipboard.writeText(publicUrl);
+      setCopiedLinkId(shareId);
+      toast({ title: "Link Copied!"});
+      setTimeout(() => setCopiedLinkId(null), 2000);
+    } catch (error) {
+      console.error("Failed to copy link to clipboard:", error);
+      toast({ title: "Copy Failed", description: "Could not copy link. Please copy it manually.", variant: "destructive"});
+    }
   };
   
   const getPublicUrl = (shareId?: string) => {
     if (!shareId || typeof window === 'undefined') return '';
+    // Ensure this runs client-side for window.location.origin
     return `${window.location.origin}/share/${shareId}`;
   }
 
@@ -224,23 +239,7 @@ const PastSessionsDialog: React.FC<PastSessionsDialogProps> = ({
   );
 };
 
-// A quick loader for buttons
-const Loader2 = ({ className }: { className?: string }) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    width="24"
-    height="24"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className={cn("animate-spin", className)}
-  >
-    <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-  </svg>
-);
-
+// Removed duplicate Loader2 definition, as it should be imported from lucide-react or defined once if custom.
+// Assuming Loader2 from lucide-react is intended for spinning animation.
 
 export default PastSessionsDialog;
