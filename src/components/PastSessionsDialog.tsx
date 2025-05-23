@@ -1,11 +1,10 @@
-
 "use client";
 
 import type { DebateSession } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Trash2, Eye, AlertCircle, BookOpen, Users, Gavel, Share2, Copy, Check, Link as LinkIcon, Loader2 } from 'lucide-react'; // Changed Link to LinkIcon, Added Loader2
+import { Trash2, Eye, AlertCircle, BookOpen, Users, Gavel, Share2, Copy, Check, Link as LinkIcon, Loader2 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import { publishSession } from '@/services/sharingService';
@@ -56,25 +55,26 @@ const PastSessionsDialog: React.FC<PastSessionsDialogProps> = ({
       let copySuccess = false;
       try {
         await navigator.clipboard.writeText(publicUrl);
-        setCopiedLinkId(shareId);
+        setCopiedLinkId(shareId); // Use shareId which is the ID for the public URL
         copySuccess = true;
         setTimeout(() => setCopiedLinkId(null), 2000);
       } catch (copyError) {
-        console.error("Failed to copy link to clipboard:", copyError);
+        // Explicitly not logging to console.error here to avoid Next.js overlay for handled error
+        // console.error("Failed to copy link to clipboard:", copyError); 
       }
 
       toast({
         title: "Session Shared!",
         description: (
           <div>
-            <p>Your session is now public. {copySuccess ? "Link copied to clipboard!" : "Please copy the link manually."}</p>
-            <Input readOnly value={publicUrl} className="mt-2 text-xs" />
+            <p>Your session is now public. {copySuccess ? "Link copied to clipboard!" : "Automatic copy failed. Please copy the link manually."}</p>
+            <Input readOnly value={publicUrl} className="mt-2 text-xs" onClick={(e) => (e.target as HTMLInputElement).select()} />
           </div>
         ),
       });
 
     } catch (error) {
-      console.error("Error sharing session:", error);
+      // console.error("Error sharing session:", error); // General sharing error, might still want to log this
       toast({ title: "Sharing Failed", description: "Could not share the session. Please try again.", variant: "destructive" });
     } finally {
       setIsSharing(null);
@@ -88,14 +88,14 @@ const PastSessionsDialog: React.FC<PastSessionsDialogProps> = ({
       toast({ title: "Link Copied!"});
       setTimeout(() => setCopiedLinkId(null), 2000);
     } catch (error) {
-      console.error("Failed to copy link to clipboard:", error);
-      toast({ title: "Copy Failed", description: "Could not copy link. Please copy it manually.", variant: "destructive"});
+      // Explicitly not logging to console.error here
+      // console.error("Failed to copy link to clipboard:", error);
+      toast({ title: "Copy Failed", description: "Could not copy link to clipboard. Please copy it manually.", variant: "destructive"});
     }
   };
   
   const getPublicUrl = (shareId?: string) => {
     if (!shareId || typeof window === 'undefined') return '';
-    // Ensure this runs client-side for window.location.origin
     return `${window.location.origin}/share/${shareId}`;
   }
 
@@ -163,6 +163,7 @@ const PastSessionsDialog: React.FC<PastSessionsDialogProps> = ({
                           value={publicUrl} 
                           className="text-xs h-8 flex-grow bg-transparent border-0 focus-visible:ring-0 focus-visible:ring-offset-0" 
                           aria-label="Shareable link"
+                          onClick={(e) => (e.target as HTMLInputElement).select()}
                         />
                         <Button 
                           size="icon" 
@@ -238,8 +239,5 @@ const PastSessionsDialog: React.FC<PastSessionsDialogProps> = ({
     </Dialog>
   );
 };
-
-// Removed duplicate Loader2 definition, as it should be imported from lucide-react or defined once if custom.
-// Assuming Loader2 from lucide-react is intended for spinning animation.
 
 export default PastSessionsDialog;
