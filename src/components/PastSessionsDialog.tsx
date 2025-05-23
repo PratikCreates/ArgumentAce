@@ -5,13 +5,14 @@ import type { DebateSession } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Trash2, Eye, AlertCircle, BookOpen, Users, Gavel, Share2, Copy, Check, LinkIcon } from 'lucide-react';
+import { Trash2, Eye, AlertCircle, BookOpen, Users, Gavel, Share2, Copy, Check, Link as LinkIcon } from 'lucide-react'; // Changed Link to LinkIcon
 import { formatDistanceToNow } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import { publishSession } from '@/services/sharingService';
 import { useToast } from '@/hooks/use-toast';
 import { useState } from 'react';
 import { Input } from './ui/input';
+import { cn } from "@/lib/utils"; // Added missing import
 
 interface PastSessionsDialogProps {
   isOpen: boolean;
