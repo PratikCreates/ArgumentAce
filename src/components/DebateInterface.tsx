@@ -7,7 +7,7 @@ import { generateArgument } from '@/ai/flows/generate-argument';
 import { analyzeArgument } from '@/ai/flows/real-time-feedback';
 import { generateCounterArgument } from '@/ai/flows/generate-counter-argument';
 import { researchTopic } from '@/ai/flows/research-topic-flow';
-import { judgeDebate } from '@/ai/flows/judge-debate-flow'; // New flow
+import { judgeDebate } from '@/ai/flows/judge-debate-flow';
 import useLocalStorage from '@/hooks/useLocalStorage';
 import { useToast } from '@/hooks/use-toast';
 
@@ -17,7 +17,7 @@ import ArgumentDisplay from './ArgumentDisplay';
 import FeedbackDisplay from './FeedbackDisplay';
 import DebateLogDisplay from './DebateLogDisplay';
 import ResearchAssistantDisplay from './ResearchAssistantDisplay';
-import JuryVerdictDisplay from './JuryVerdictDisplay'; // New component
+import JuryVerdictDisplay from './JuryVerdictDisplay';
 import PastSessionsDialog from './PastSessionsDialog';
 
 import { Button } from '@/components/ui/button';
@@ -27,7 +27,7 @@ import { History, MessageSquareText, Save, Send, Loader2, Gavel, Scale } from 'l
 import { ScrollArea } from './ui/scroll-area';
 
 const SESSIONS_STORAGE_KEY = 'argumentAceSessions';
-const MIN_TURNS_FOR_JURY = 4; // User + AI + User + AI = 4 turns minimum
+const MIN_TURNS_FOR_JURY = 4; 
 
 const DebateInterface: React.FC = () => {
   const [topic, setTopic] = useState<string>('');
@@ -39,15 +39,17 @@ const DebateInterface: React.FC = () => {
   
   const [feedback, setFeedback] = useState<AnalyzeArgumentOutput | null>(null);
   const [researchPoints, setResearchPoints] = useState<string[] | null>(null);
-  const [juryVerdict, setJuryVerdict] = useState<JudgeDebateOutput | null>(null); // New state
+  const [juryVerdict, setJuryVerdict] = useState<JudgeDebateOutput | null>(null);
 
   const [isLoadingAiSuggestedArgument, setIsLoadingAiSuggestedArgument] = useState<boolean>(false);
   const [isLoadingFeedbackAndAiTurn, setIsLoadingFeedbackAndAiTurn] = useState<boolean>(false);
   const [isLoadingResearch, setIsLoadingResearch] = useState<boolean>(false);
-  const [isLoadingJuryVerdict, setIsLoadingJuryVerdict] = useState<boolean>(false); // New loading state
+  const [isLoadingJuryVerdict, setIsLoadingJuryVerdict] = useState<boolean>(false);
 
   const [sessions, setSessions] = useLocalStorage<DebateSession[]>(SESSIONS_STORAGE_KEY, []);
   const [isPastSessionsDialogOpen, setIsPastSessionsDialogOpen] = useState<boolean>(false);
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+
 
   const { toast } = useToast();
 
@@ -58,7 +60,7 @@ const DebateInterface: React.FC = () => {
     }
     setIsLoadingAiSuggestedArgument(true);
     setGeneratedArgument(null);
-    setJuryVerdict(null); // Clear jury verdict if new argument is generated
+    setJuryVerdict(null); 
     try {
       const result = await generateArgument({ topic, reasoningSkill });
       setGeneratedArgument(result.argument);
@@ -77,7 +79,7 @@ const DebateInterface: React.FC = () => {
     }
     setIsLoadingResearch(true);
     setResearchPoints(null);
-    setJuryVerdict(null); // Clear jury verdict if topic is researched
+    setJuryVerdict(null); 
     try {
       const result: ResearchTopicOutput = await researchTopic({ topic });
       setResearchPoints(result.researchPoints);
@@ -101,7 +103,7 @@ const DebateInterface: React.FC = () => {
 
     setIsLoadingFeedbackAndAiTurn(true);
     setFeedback(null);
-    setJuryVerdict(null); // Clear previous jury verdict when a new turn is submitted
+    setJuryVerdict(null);
 
     const newUserTurn: DebateTurn = { speaker: 'user', text: userArgumentInput, timestamp: new Date().toISOString() };
     const updatedDebateLog = [...debateLog, newUserTurn];
@@ -173,7 +175,8 @@ const DebateInterface: React.FC = () => {
     setDebateLog([]);
     setUserArgumentInput('');
     setJuryVerdict(null);
-  }, [topic, reasoningSkill]); // Resetting on reasoningSkill change too
+    setCurrentSessionId(null); // Reset current session ID when topic or skill changes
+  }, [topic, reasoningSkill]);
 
 
   const handleSaveSession = () => {
@@ -181,18 +184,40 @@ const DebateInterface: React.FC = () => {
       toast({ title: "Nothing to Save", description: "Please enter a topic or start the debate before saving.", variant: "destructive" });
       return;
     }
-    const newSession: DebateSession = {
-      id: Date.now().toString(),
-      topic,
-      debateLog,
-      feedback: feedback ?? undefined, 
-      researchPoints: researchPoints ?? undefined,
-      juryVerdict: juryVerdict ?? undefined, // Save jury verdict
-      timestamp: new Date().toISOString(),
-      reasoningSkill,
-    };
-    setSessions(prevSessions => [newSession, ...prevSessions.sort((a,b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())]);
-    toast({ title: "Session Saved!", description: "Your current debate session has been saved." });
+    
+    const existingSessionIndex = currentSessionId ? sessions.findIndex(s => s.id === currentSessionId) : -1;
+    let newSession: DebateSession;
+
+    if (existingSessionIndex > -1) { // Update existing session
+      newSession = {
+        ...sessions[existingSessionIndex],
+        topic,
+        debateLog,
+        feedback: feedback ?? undefined, 
+        researchPoints: researchPoints ?? undefined,
+        juryVerdict: juryVerdict ?? undefined,
+        timestamp: new Date().toISOString(),
+        reasoningSkill,
+      };
+      const updatedSessions = [...sessions];
+      updatedSessions[existingSessionIndex] = newSession;
+      setSessions(updatedSessions.sort((a,b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()));
+      toast({ title: "Session Updated!", description: "Your current debate session has been updated." });
+    } else { // Create new session
+      newSession = {
+        id: Date.now().toString(),
+        topic,
+        debateLog,
+        feedback: feedback ?? undefined, 
+        researchPoints: researchPoints ?? undefined,
+        juryVerdict: juryVerdict ?? undefined,
+        timestamp: new Date().toISOString(),
+        reasoningSkill,
+      };
+      setCurrentSessionId(newSession.id);
+      setSessions(prevSessions => [newSession, ...prevSessions.sort((a,b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())]);
+      toast({ title: "Session Saved!", description: "Your current debate session has been saved." });
+    }
   };
 
   const handleLoadSession = (session: DebateSession) => {
@@ -200,8 +225,9 @@ const DebateInterface: React.FC = () => {
     setDebateLog(session.debateLog);
     setFeedback(session.feedback || null);
     setResearchPoints(session.researchPoints || null);
-    setJuryVerdict(session.juryVerdict || null); // Load jury verdict
+    setJuryVerdict(session.juryVerdict || null);
     setReasoningSkill(session.reasoningSkill || 'Intermediate');
+    setCurrentSessionId(session.id); 
     setUserArgumentInput(''); 
     setGeneratedArgument(null); 
     toast({ title: "Session Loaded", description: `Session for topic "${session.topic}" has been loaded.` });
@@ -209,12 +235,28 @@ const DebateInterface: React.FC = () => {
 
   const handleDeleteSession = (sessionId: string) => {
     setSessions(sessions.filter(s => s.id !== sessionId));
+    if (currentSessionId === sessionId) {
+      // If current session is deleted, reset the interface
+      setTopic('');
+      setReasoningSkill('Intermediate'); // Or some default
+    }
     toast({ title: "Session Deleted", description: "The selected session has been deleted." });
   };
 
   const handleDeleteAllSessions = () => {
     setSessions([]);
+    setTopic('');
+    setReasoningSkill('Intermediate');
     toast({ title: "All Sessions Deleted", description: "All saved sessions have been deleted." });
+  };
+
+  const handleUpdateSessionWithShareId = (updatedSession: DebateSession) => {
+    const sessionIndex = sessions.findIndex(s => s.id === updatedSession.id);
+    if (sessionIndex > -1) {
+      const newSessions = [...sessions];
+      newSessions[sessionIndex] = updatedSession;
+      setSessions(newSessions);
+    }
   };
   
   const userLastTurnText = debateLog.filter(t => t.speaker === 'user').pop()?.text || "";
@@ -235,7 +277,7 @@ const DebateInterface: React.FC = () => {
             Jury Verdict
           </Button>
           <Button variant="outline" onClick={handleSaveSession} disabled={(!topic && debateLog.length === 0) || isLoadingFeedbackAndAiTurn || isLoadingJuryVerdict}>
-            <Save className="mr-2 h-4 w-4" /> Save Session
+            <Save className="mr-2 h-4 w-4" /> {currentSessionId ? 'Update Session' : 'Save Session'}
           </Button>
           <Button variant="outline" onClick={() => setIsPastSessionsDialogOpen(true)}>
             <History className="mr-2 h-4 w-4" /> Past Sessions
@@ -244,8 +286,7 @@ const DebateInterface: React.FC = () => {
       </header>
 
       <main className="flex-grow grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Left Panel */}
-        <ScrollArea className="h-[calc(100vh-170px)] md:h-auto"> {/* Adjusted height for header */}
+        <ScrollArea className="h-[calc(100vh-170px)] md:h-auto">
           <div className="space-y-6 pr-3">
             <ArgumentGeneratorControls
               topic={topic}
@@ -305,8 +346,7 @@ const DebateInterface: React.FC = () => {
           </div>
         </ScrollArea>
 
-        {/* Right Panel */}
-        <ScrollArea className="h-[calc(100vh-170px)] md:h-auto"> {/* Adjusted height for header */}
+        <ScrollArea className="h-[calc(100vh-170px)] md:h-auto">
           <div className="space-y-6 md:sticky md:top-6 pr-1">
              <JuryVerdictDisplay
               verdict={juryVerdict}
@@ -338,6 +378,7 @@ const DebateInterface: React.FC = () => {
         onLoadSession={handleLoadSession}
         onDeleteSession={handleDeleteSession}
         onDeleteAllSessions={handleDeleteAllSessions}
+        onUpdateSession={handleUpdateSessionWithShareId}
       />
     </div>
   );

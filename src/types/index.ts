@@ -12,17 +12,20 @@ export interface DebateTurn {
 }
 
 export interface DebateSession {
-  id: string;
+  id: string; // Local session ID
   topic: string;
   feedback?: AIAnalyzeArgumentOutput; // Feedback for the last user turn
   debateLog: DebateTurn[];
   researchPoints?: string[];
-  juryVerdict?: AIJudgeDebateOutput; // Added jury verdict
+  juryVerdict?: AIJudgeDebateOutput;
   timestamp: string;
   reasoningSkill: ReasoningSkill;
+  shareId?: string; // Unique ID for public sharing
+  isPublic?: boolean; // Flag to indicate if session is publicly shared
 }
 
 // Re-exporting AI types for convenience
 export type AnalyzeArgumentOutput = AIAnalyzeArgumentOutput;
 export type ResearchTopicOutput = AIResearchTopicOutput;
 export type JudgeDebateOutput = AIJudgeDebateOutput;
+
