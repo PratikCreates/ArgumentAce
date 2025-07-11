@@ -1,8 +1,8 @@
-# ArgumentAce: Your AI Debate Coach
+# ArgumentAce: Win your next debate.
 
 ## Elevator Pitch
 
-Hone your debating skills with ArgumentAce! Practice against a smart AI opponent, get instant feedback on logical fallacies, and receive a jury verdict to track your progress and sharpen your arguments.
+Never lose an argument again. ArgumentAce is your personal AI debate coach. Spar against an adaptive AI, get instant feedback on your logic, and have an AI jury declare a winner to help you build unbeatable arguments.
 
 ## Key Features
 
