@@ -42,7 +42,7 @@ export async function generateDebatePdf(sessionData: DebateSessionDataForPdf): P
     };
     
     const addSectionTitle = (title: string) => {
-        checkPageBreak(30);
+        checkPageBreak(40); // Check for enough space for the title and some content
         y += 10;
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(16);
@@ -89,9 +89,9 @@ export async function generateDebatePdf(sessionData: DebateSessionDataForPdf): P
         doc.setFontSize(10);
         doc.setTextColor(TEXT_COLOR);
         sessionData.researchPoints.forEach(point => {
-            const splitPoint = doc.splitTextToSize(`• ${point}`, pageWidth - margin * 2);
-            checkPageBreak(splitPoint.length * 10);
-            doc.text(splitPoint, margin, y);
+            const splitPoint = doc.splitTextToSize(`• ${point}`, pageWidth - margin * 2 - 10);
+            checkPageBreak(splitPoint.length * 10 + 5);
+            doc.text(splitPoint, margin + 10, y);
             y += splitPoint.length * 10 + 5;
         });
         y += 10;
@@ -115,8 +115,8 @@ export async function generateDebatePdf(sessionData: DebateSessionDataForPdf): P
         }
 
         const addVerdictSection = (title: string, content: string[] | string | undefined) => {
-            if (!content) return;
-            checkPageBreak(25);
+            if (!content || (Array.isArray(content) && content.length === 0)) return;
+            checkPageBreak(30);
             doc.setFont('helvetica', 'bold');
             doc.setFontSize(11);
             doc.setTextColor(PRIMARY_COLOR);
@@ -139,7 +139,7 @@ export async function generateDebatePdf(sessionData: DebateSessionDataForPdf): P
                  doc.text(splitContent, margin, y);
                  y += splitContent.length * 10 + 5;
             }
-             y += 5;
+             y += 10; // Extra space after section
         };
 
         addVerdictSection('Overall Assessment:', overallAssessment);
@@ -161,10 +161,10 @@ export async function generateDebatePdf(sessionData: DebateSessionDataForPdf): P
         sessionData.debateLog.forEach(turn => {
             const isUser = turn.speaker === 'user';
             const speaker = isUser ? 'User' : 'AI Opponent';
-            const timestamp = new Date(turn.timestamp).toLocaleTimeString();
+            const timestamp = new Date(turn.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
             
-            const textLines = doc.splitTextToSize(turn.text, pageWidth - margin * 2 - 10);
-            const boxHeight = textLines.length * 10 + 20; // 10 per line + padding
+            const textLines = doc.splitTextToSize(turn.text, pageWidth - margin * 2 - 15);
+            const boxHeight = textLines.length * 12 + 25; // Adjusted line height and padding
             checkPageBreak(boxHeight + 20);
 
             doc.setFillColor(isUser ? BACKGROUND_COLOR_USER : BACKGROUND_COLOR_AI);
@@ -172,49 +172,54 @@ export async function generateDebatePdf(sessionData: DebateSessionDataForPdf): P
             
             doc.setFont('helvetica', 'bold');
             doc.setTextColor(TEXT_COLOR);
-            doc.text(speaker, margin + 5, y + 10);
+            doc.text(speaker, margin + 8, y + 12);
             
             doc.setFont('helvetica', 'normal');
             doc.setTextColor(LIGHT_TEXT_COLOR);
-            doc.text(timestamp, pageWidth - margin - 5, y + 10, { align: 'right' });
+            doc.text(timestamp, pageWidth - margin - 8, y + 12, { align: 'right' });
             
             doc.setTextColor(TEXT_COLOR);
-            doc.text(textLines, margin + 5, y + 25);
+            doc.text(textLines, margin + 8, y + 28, { lineHeightFactor: 1.2 });
             
             y += boxHeight + 10;
         });
+        y += 10; // Add space after the last debate log entry
     }
 
 
-    // --- Note on Feedback ---
-    // Since feedback is only stored for the very last user turn in the current state model,
-    // we'll add it as a final section if it exists.
+    // --- Feedback on Last User Argument ---
     if (sessionData.lastFeedback) {
         addSectionTitle('Feedback on Last User Argument');
         const { fallacies, persuasionTechniques, counterPoints, feedback } = sessionData.lastFeedback;
 
         const addFeedbackList = (title: string, items: string[] | undefined) => {
             if (items && items.length > 0) {
-                checkPageBreak(25);
+                checkPageBreak(30);
                 doc.setFont('helvetica', 'bold');
+                doc.setFontSize(11);
+                doc.setTextColor(PRIMARY_COLOR);
                 doc.text(title, margin, y);
-                y += 12;
+                y += 15;
                 doc.setFont('helvetica', 'normal');
                 items.forEach(item => {
-                    const splitItem = doc.splitTextToSize(`• ${item}`, pageWidth - margin * 2);
+                    const splitItem = doc.splitTextToSize(`• ${item}`, pageWidth - margin * 2 - 10);
                     checkPageBreak(splitItem.length * 10 + 5);
                     doc.text(splitItem, margin + 10, y);
                     y += splitItem.length * 10 + 5;
                 });
+                y += 10;
             }
         };
-
-        const splitFeedback = doc.splitTextToSize(feedback, pageWidth - margin * 2);
-        checkPageBreak(splitFeedback.length * 10 + 20);
+        
+        checkPageBreak(30);
         doc.setFont('helvetica', 'bold');
+        doc.setFontSize(11);
+        doc.setTextColor(PRIMARY_COLOR);
         doc.text('Overall Analysis:', margin, y);
-        y += 12;
+        y += 15;
         doc.setFont('helvetica', 'normal');
+        const splitFeedback = doc.splitTextToSize(feedback, pageWidth - margin * 2);
+        checkPageBreak(splitFeedback.length * 10 + 10);
         doc.text(splitFeedback, margin, y);
         y += splitFeedback.length * 10 + 10;
         
