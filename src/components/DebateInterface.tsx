@@ -8,7 +8,6 @@ import { analyzeArgument } from '@/ai/flows/real-time-feedback';
 import { generateCounterArgument } from '@/ai/flows/generate-counter-argument';
 import { researchTopic } from '@/ai/flows/research-topic-flow';
 import { judgeDebate } from '@/ai/flows/judge-debate-flow';
-import { textToSpeech } from '@/ai/flows/text-to-speech-flow';
 import useLocalStorage from '@/hooks/useLocalStorage';
 import { useToast } from '@/hooks/use-toast';
 
@@ -92,27 +91,6 @@ const DebateInterface: React.FC = () => {
     }
   };
 
-  const handleGenerateAudioForTurn = async (turnText: string, turnIndex: number) => {
-    try {
-      const audioResult = await textToSpeech({ text: turnText });
-      setDebateLog(prevLog => {
-        const newLog = [...prevLog];
-        newLog[turnIndex] = { ...newLog[turnIndex], audioUrl: audioResult.audioUrl, isGeneratingAudio: false };
-        return newLog;
-      });
-    } catch (error) {
-      console.error("Error generating audio:", error);
-      // Optionally show a toast, but might be too noisy.
-      // We'll just stop the loading indicator on the specific turn.
-      setDebateLog(prevLog => {
-        const newLog = [...prevLog];
-        newLog[turnIndex] = { ...newLog[turnIndex], isGeneratingAudio: false }; // Still turn off loading on error
-        return newLog;
-      });
-    }
-  };
-
-
   const handleSubmitUserTurn = async () => {
     if (!userArgumentInput.trim()) {
       toast({ title: "Argument Required", description: "Please enter your argument.", variant: "destructive" });
@@ -148,15 +126,11 @@ const DebateInterface: React.FC = () => {
       const newAiTurn: DebateTurn = { 
         speaker: 'ai', 
         text: aiCounterResult.counterArgument, 
-        timestamp: new Date().toISOString(),
-        isGeneratingAudio: true // Set loading state for audio
+        timestamp: new Date().toISOString()
       };
       
       const finalDebateLog = [...updatedDebateLog, newAiTurn];
       setDebateLog(finalDebateLog);
-
-      // Trigger non-blocking audio generation
-      handleGenerateAudioForTurn(newAiTurn.text, finalDebateLog.length - 1);
 
     } catch (error) {
       console.error("Error processing turn:", error);
