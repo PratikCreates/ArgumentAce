@@ -48,6 +48,29 @@ We are incredibly proud of creating a fully functional, end-to-end debate coachi
 
 Throughout this hackathon, we learned a great deal about the practicalities of building AI-powered applications. Our biggest takeaway was the importance of **structured AI development**. Using Genkit to define schemas (with Zod) and flows forced us to think clearly about our inputs and outputs, which made the AI's behavior more predictable and our code easier to debug. We also gained a deeper appreciation for the art of prompt engineering and the challenges of managing complex application state in a reactive UI framework.
 
+## Hackathon Journal: Reflections
+
+### What is the one major problem you are facing right now? How do you plan on solving it?
+
+Our biggest challenge right now is the **persistence of shared debate sessions**. The "Share" feature is functional on the frontend, but the backend is a stub using an in-memory `Map`. This means a shared link only works for a few moments and becomes invalid if the server restarts.
+
+**Our plan to solve this is clear:** We will replace the stubbed service with a real, persistent database like **Firebase Firestore**. The plan involves rewriting our `sharingService.ts` to create and read documents from a Firestore collection, which will make our shared links robust and truly public.
+
+### What tech stack are you using and how has your workflow evolved over the past week?
+
+We are using a modern, AI-native tech stack:
+*   **Framework:** Next.js (with the App Router)
+*   **Language:** TypeScript
+*   **AI Integration:** Google's **Genkit** framework, using the **Gemini 2.0 Flash model**.
+*   **UI:** **ShadCN UI** components styled with **Tailwind CSS**.
+*   **State Management:** React Hooks and a custom `useLocalStorage` hook.
+
+Our workflow has evolved from foundational work to rapid feature iteration. Our process is now a tight loop: Ideate a feature, define the AI logic and schemas in Genkit first, build the React components, and then connect them. This structured, AI-first workflow has been incredibly effective.
+
+### What is one thing you have learned that you wish you knew at the start of this hackathon?
+
+The one thing we wish we knew at the start is **the deceptive complexity of client-side PDF generation for dynamic, scrollable content.** We initially thought adding a "Download as PDF" button would be straightforward. However, we quickly ran into issues with `html2canvas` not capturing content inside scrollable divs. We had to learn and implement a "capture phase" where we re-render the component with an expanded layout specifically for the PDF capture. It was a powerful lesson in how seemingly simple user features can hide significant implementation challenges.
+
 ## What's Next for ArgumentAce
 
 This is just the beginning! We have a clear vision for the future of ArgumentAce:
