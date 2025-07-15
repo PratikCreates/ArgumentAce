@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useState, useRef } from 'react';
@@ -10,19 +11,14 @@ import Link from 'next/link';
 import { Home, Download, Loader2 } from 'lucide-react';
 import type { DebateSession } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
-
-// Dynamically import jsPDF and html2canvas only when needed
-type jsPDFType = typeof import('jspdf').default;
-type html2canvasType = typeof import('html2canvas').default;
+import { generateDebatePdf } from '@/lib/pdfGenerator';
 
 export default function SharedSessionPage() {
   const { sessionId } = useParams(); // ✅ unwraps sessionId properly
   const [session, setSession] = useState<DebateSession | null | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(true);
   const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
-  const [isPdfCapturePhase, setIsPdfCapturePhase] = useState(false);
-  const contentRef = useRef<HTMLDivElement>(null);
-
+  
   useEffect(() => {
     const fetchSession = async () => {
       setIsLoading(true);
@@ -43,58 +39,28 @@ export default function SharedSessionPage() {
     fetchSession();
   }, [sessionId]);
 
-  const generatePdf = async () => {
-    if (!contentRef.current || !session) return;
-
+  const handleDownloadPdfClick = async () => {
+    if (!session) return;
+    setIsDownloadingPdf(true);
     try {
-      const { default: jsPDF } = await (import('jspdf') as Promise<{ default: jsPDFType }>);
-      const { default: html2canvas } = await (import('html2canvas') as Promise<{ default: html2canvasType }>);
-
-      const canvas = await html2canvas(contentRef.current, {
-        scale: 2,
-        useCORS: true,
-        logging: false,
-        height: contentRef.current.scrollHeight,
-        windowHeight: contentRef.current.scrollHeight,
-        scrollY: 0,
+      await generateDebatePdf({
+        topic: session.topic,
+        reasoningSkill: session.reasoningSkill,
+        debateLog: session.debateLog,
+        researchPoints: session.researchPoints,
+        juryVerdict: session.juryVerdict,
+        // The feedback on the shared session is for the *last* user turn, so we can include it.
+        // For a more complex PDF, you might want to associate feedback with each turn.
+        lastFeedback: session.feedback 
       });
-
-      const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
-
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const margin = 30;
-      const imgProps = pdf.getImageProperties(imgData);
-      const availableWidth = pdfWidth - 2 * margin;
-      const scaleFactor = availableWidth / imgProps.width;
-      const scaledImgHeight = imgProps.height * scaleFactor;
-      const scaledImgWidth = imgProps.width * scaleFactor;
-
-      pdf.setFontSize(18);
-      pdf.text(session.topic, pdfWidth / 2, margin + 10, { align: 'center' });
-
-      pdf.addImage(imgData, 'PNG', margin, margin + 30, scaledImgWidth, scaledImgHeight);
-      pdf.save(`ArgumentAce_Debate_${session.topic.replace(/[^a-z0-9]/gi, '_')}.pdf`);
     } catch (error) {
       console.error("Error generating PDF:", error);
       alert("Failed to generate PDF. Please try again.");
+    } finally {
+      setIsDownloadingPdf(false);
     }
   };
 
-  useEffect(() => {
-    if (isPdfCapturePhase && contentRef.current && session) {
-      generatePdf().finally(() => {
-        setIsPdfCapturePhase(false);
-        setIsDownloadingPdf(false);
-      });
-    }
-  }, [isPdfCapturePhase, session]);
-
-  const handleDownloadPdfClick = () => {
-    if (!contentRef.current || !session) return;
-    setIsDownloadingPdf(true);
-    setIsPdfCapturePhase(true);
-  };
 
   if (isLoading) {
     return (
@@ -148,8 +114,8 @@ export default function SharedSessionPage() {
           </div>
         </div>
       </header>
-      <div ref={contentRef}>
-        <SharedSessionDisplay session={session} isPdfCapturePhase={isPdfCapturePhase} />
+      <div>
+        <SharedSessionDisplay session={session} />
       </div>
       <footer className="py-8 text-center text-muted-foreground">
         <p>&copy; {new Date().getFullYear()} ArgumentAce. Powered by AI.</p>

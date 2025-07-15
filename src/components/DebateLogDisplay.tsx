@@ -13,10 +13,9 @@ interface DebateLogDisplayProps {
   debateLog: DebateTurn[];
   topic: string;
   isLoadingAiResponse: boolean;
-  isPdfCapturePhase?: boolean;
 }
 
-const DebateLogDisplay: React.FC<DebateLogDisplayProps> = ({ debateLog, topic, isLoadingAiResponse, isPdfCapturePhase = false }) => {
+const DebateLogDisplay: React.FC<DebateLogDisplayProps> = ({ debateLog, topic, isLoadingAiResponse }) => {
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
 
@@ -41,14 +40,10 @@ const DebateLogDisplay: React.FC<DebateLogDisplayProps> = ({ debateLog, topic, i
 
   const scrollAreaClass = cn(
     "w-full pr-4",
-    isPdfCapturePhase 
-      ? "h-auto overflow-visible" 
-      : "h-[300px] md:h-[400px]"
+    "h-[300px] md:h-[400px]"
   );
   
-  const scrollAreaViewportClass = cn(
-    isPdfCapturePhase ? "overflow-visible" : ""
-  );
+  const scrollAreaViewportClass = cn("");
 
   return (
     <Card className="shadow-lg">

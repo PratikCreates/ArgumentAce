@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, forwardRef, useImperativeHandle } from 'react';
 import type { DebateSession, ReasoningSkill, AnalyzeArgumentOutput, ResearchTopicOutput, DebateTurn, JudgeDebateOutput } from '@/types';
 import { generateArgument } from '@/ai/flows/generate-argument';
 import { analyzeArgument } from '@/ai/flows/real-time-feedback';
@@ -30,11 +30,22 @@ const SESSIONS_STORAGE_KEY = 'argumentAceSessions';
 const MIN_TURNS_FOR_JURY = 4; 
 
 interface DebateInterfaceProps {
-  isPdfCapturePhase?: boolean;
-  onTopicChange?: (topic: string) => void;
+  // No props needed for now
 }
 
-const DebateInterface: React.FC<DebateInterfaceProps> = ({ isPdfCapturePhase = false, onTopicChange }) => {
+export interface DebateInterfaceHandle {
+  getSessionData: () => {
+    topic: string;
+    reasoningSkill: ReasoningSkill;
+    debateLog: DebateTurn[];
+    researchPoints: string[] | null;
+    juryVerdict: JudgeDebateOutput | null;
+    lastFeedback: AnalyzeArgumentOutput | null;
+  };
+}
+
+
+const DebateInterface = forwardRef<DebateInterfaceHandle, DebateInterfaceProps>((props, ref) => {
   const [topic, setTopic] = useState<string>('');
   const [reasoningSkill, setReasoningSkill] = useState<ReasoningSkill>('Intermediate');
   const [generatedArgument, setGeneratedArgument] = useState<string | null>(null);
@@ -55,14 +66,19 @@ const DebateInterface: React.FC<DebateInterfaceProps> = ({ isPdfCapturePhase = f
   const [isPastSessionsDialogOpen, setIsPastSessionsDialogOpen] = useState<boolean>(false);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
 
-
   const { toast } = useToast();
 
-  useEffect(() => {
-    if (onTopicChange) {
-      onTopicChange(topic);
-    }
-  }, [topic, onTopicChange]);
+  useImperativeHandle(ref, () => ({
+    getSessionData: () => ({
+      topic,
+      reasoningSkill,
+      debateLog,
+      researchPoints,
+      juryVerdict,
+      lastFeedback: feedback,
+    }),
+  }));
+
 
   const handleGenerateAiSuggestion = async () => {
     if (!topic.trim()) {
@@ -302,7 +318,7 @@ const DebateInterface: React.FC<DebateInterfaceProps> = ({ isPdfCapturePhase = f
       </header>
 
       <main className="flex-grow grid grid-cols-1 md:grid-cols-2 gap-6">
-        <ScrollArea className={isPdfCapturePhase ? "h-auto" : "h-[calc(100vh-170px)] md:h-auto"}>
+        <ScrollArea className={"h-[calc(100vh-170px)] md:h-auto"}>
           <div className="space-y-6 pr-3">
             <ArgumentGeneratorControls
               topic={topic}
@@ -362,7 +378,7 @@ const DebateInterface: React.FC<DebateInterfaceProps> = ({ isPdfCapturePhase = f
           </div>
         </ScrollArea>
 
-        <ScrollArea className={isPdfCapturePhase ? "h-auto" : "h-[calc(100vh-170px)] md:h-auto"}>
+        <ScrollArea className={"h-[calc(100vh-170px)] md:h-auto"}>
           <div className="space-y-6 md:sticky md:top-6 pr-1">
              <JuryVerdictDisplay
               verdict={juryVerdict}
@@ -378,7 +394,6 @@ const DebateInterface: React.FC<DebateInterfaceProps> = ({ isPdfCapturePhase = f
               debateLog={debateLog}
               topic={topic}
               isLoadingAiResponse={isLoadingFeedbackAndAiTurn && userArgumentInput === ''}
-              isPdfCapturePhase={isPdfCapturePhase}
             />
             <FeedbackDisplay 
                 feedback={feedback} 
@@ -399,6 +414,8 @@ const DebateInterface: React.FC<DebateInterfaceProps> = ({ isPdfCapturePhase = f
       />
     </div>
   );
-};
+});
+
+DebateInterface.displayName = "DebateInterface";
 
 export default DebateInterface;

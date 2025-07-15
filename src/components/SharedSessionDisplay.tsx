@@ -12,10 +12,9 @@ import { cn } from '@/lib/utils';
 
 interface SharedSessionDisplayProps {
   session: DebateSession;
-  isPdfCapturePhase?: boolean; // New prop
 }
 
-const SharedSessionDisplay: React.FC<SharedSessionDisplayProps> = ({ session, isPdfCapturePhase }) => {
+const SharedSessionDisplay: React.FC<SharedSessionDisplayProps> = ({ session }) => {
 
   const renderStrengthsWeaknesses = (items: string[] | undefined, type: 'strength' | 'weakness') => {
     if (!items || items.length === 0) {
@@ -36,21 +35,16 @@ const SharedSessionDisplay: React.FC<SharedSessionDisplayProps> = ({ session, is
     );
   };
 
-  // Conditional class for ScrollArea based on PDF capture phase
   const scrollAreaClass = cn(
     "w-full pr-4",
-    isPdfCapturePhase 
-      ? "h-auto overflow-visible" 
-      : "h-[400px] md:h-[600px]"
+    "h-[400px] md:h-[600px]"
   );
   
-  const scrollAreaViewportClass = cn(
-    isPdfCapturePhase ? "overflow-visible" : ""
-  );
+  const scrollAreaViewportClass = cn("");
 
 
   return (
-    <div className={cn("container mx-auto py-8 px-4 space-y-6", isPdfCapturePhase ? "bg-white" : "")}> {/* Ensure background for PDF if needed */}
+    <div className={cn("container mx-auto py-8 px-4 space-y-6")}>
       <Card className="shadow-xl">
         <CardHeader className="border-b">
           <CardTitle className="text-3xl font-bold text-primary">{session.topic}</CardTitle>
