@@ -40,7 +40,6 @@ export interface DebateInterfaceHandle {
     debateLog: DebateTurn[];
     researchPoints: string[] | null;
     juryVerdict: JudgeDebateOutput | null;
-    lastFeedback: AnalyzeArgumentOutput | null;
   };
 }
 
@@ -53,7 +52,7 @@ const DebateInterface = forwardRef<DebateInterfaceHandle, DebateInterfaceProps>(
   const [userArgumentInput, setUserArgumentInput] = useState<string>('');
   const [debateLog, setDebateLog] = useState<DebateTurn[]>([]);
   
-  const [feedback, setFeedback] = useState<AnalyzeArgumentOutput | null>(null);
+  const [lastFeedback, setLastFeedback] = useState<AnalyzeArgumentOutput | null>(null);
   const [researchPoints, setResearchPoints] = useState<string[] | null>(null);
   const [juryVerdict, setJuryVerdict] = useState<JudgeDebateOutput | null>(null);
 
@@ -75,7 +74,6 @@ const DebateInterface = forwardRef<DebateInterfaceHandle, DebateInterfaceProps>(
       debateLog,
       researchPoints,
       juryVerdict,
-      lastFeedback: feedback,
     }),
   }));
 
@@ -129,38 +127,45 @@ const DebateInterface = forwardRef<DebateInterfaceHandle, DebateInterfaceProps>(
     }
 
     setIsLoadingFeedbackAndAiTurn(true);
-    setFeedback(null);
+    setLastFeedback(null);
     setJuryVerdict(null);
 
-    const newUserTurn: DebateTurn = { speaker: 'user', text: userArgumentInput, timestamp: new Date().toISOString() };
-    const updatedDebateLog = [...debateLog, newUserTurn];
-    setDebateLog(updatedDebateLog);
+    const userTurnText = userArgumentInput;
     setUserArgumentInput(''); 
 
+    // Add user turn to log immediately, but without feedback yet.
+    const optimisticUserTurn: DebateTurn = { speaker: 'user', text: userTurnText, timestamp: new Date().toISOString() };
+    const logWithUserTurn = [...debateLog, optimisticUserTurn];
+    setDebateLog(logWithUserTurn);
+
     try {
-      // Get feedback and AI text response in parallel for speed
       const [feedbackResult, aiCounterResult] = await Promise.all([
-        analyzeArgument({ argument: newUserTurn.text, topic }),
+        analyzeArgument({ argument: userTurnText, topic }),
         generateCounterArgument({
           topic,
-          formattedDebateHistory: updatedDebateLog.map(turn => `${turn.speaker === 'user' ? 'User' : 'AI'}: "${turn.text}"`).join('\n\n'),
+          formattedDebateHistory: logWithUserTurn.map(turn => `${turn.speaker === 'user' ? 'User' : 'AI'}: "${turn.text}"`).join('\n\n'),
           opponentSkill: reasoningSkill
         })
       ]);
       
-      setFeedback(feedbackResult);
+      setLastFeedback(feedbackResult);
 
+      // Now update the user's turn in the log with the feedback we received
+      const finalUserTurn: DebateTurn = { ...optimisticUserTurn, feedback: feedbackResult };
+      
       const newAiTurn: DebateTurn = { 
         speaker: 'ai', 
         text: aiCounterResult.counterArgument, 
         timestamp: new Date().toISOString()
       };
       
-      const finalDebateLog = [...updatedDebateLog, newAiTurn];
-      setDebateLog(finalDebateLog);
+      // Update the log with both the user turn's feedback and the new AI turn
+      setDebateLog([...debateLog, finalUserTurn, newAiTurn]);
 
     } catch (error) {
       console.error("Error processing turn:", error);
+      // Revert the optimistic update on error
+      setDebateLog(debateLog);
       toast({ title: "Error Processing Turn", description: "Failed to get feedback or AI response. Please try again.", variant: "destructive" });
     } finally {
       setIsLoadingFeedbackAndAiTurn(false);
@@ -203,11 +208,11 @@ const DebateInterface = forwardRef<DebateInterfaceHandle, DebateInterfaceProps>(
   useEffect(() => {
     setResearchPoints(null);
     setGeneratedArgument(null);
-    setFeedback(null);
+    setLastFeedback(null);
     setDebateLog([]);
     setUserArgumentInput('');
     setJuryVerdict(null);
-    setCurrentSessionId(null); // Reset current session ID when topic or skill changes
+    setCurrentSessionId(null);
   }, [topic, reasoningSkill]);
 
 
@@ -225,7 +230,6 @@ const DebateInterface = forwardRef<DebateInterfaceHandle, DebateInterfaceProps>(
         ...sessions[existingSessionIndex],
         topic,
         debateLog,
-        feedback: feedback ?? undefined, 
         researchPoints: researchPoints ?? undefined,
         juryVerdict: juryVerdict ?? undefined,
         timestamp: new Date().toISOString(),
@@ -240,7 +244,6 @@ const DebateInterface = forwardRef<DebateInterfaceHandle, DebateInterfaceProps>(
         id: Date.now().toString(),
         topic,
         debateLog,
-        feedback: feedback ?? undefined, 
         researchPoints: researchPoints ?? undefined,
         juryVerdict: juryVerdict ?? undefined,
         timestamp: new Date().toISOString(),
@@ -255,22 +258,21 @@ const DebateInterface = forwardRef<DebateInterfaceHandle, DebateInterfaceProps>(
   const handleLoadSession = (session: DebateSession) => {
     setTopic(session.topic);
     setDebateLog(session.debateLog);
-    setFeedback(session.feedback || null);
     setResearchPoints(session.researchPoints || null);
     setJuryVerdict(session.juryVerdict || null);
     setReasoningSkill(session.reasoningSkill || 'Intermediate');
     setCurrentSessionId(session.id); 
     setUserArgumentInput(''); 
     setGeneratedArgument(null); 
+    setLastFeedback(session.debateLog.filter(t => t.speaker === 'user').pop()?.feedback || null);
     toast({ title: "Session Loaded", description: `Session for topic "${session.topic}" has been loaded.` });
   };
 
   const handleDeleteSession = (sessionId: string) => {
     setSessions(sessions.filter(s => s.id !== sessionId));
     if (currentSessionId === sessionId) {
-      // If current session is deleted, reset the interface
       setTopic('');
-      setReasoningSkill('Intermediate'); // Or some default
+      setReasoningSkill('Intermediate');
     }
     toast({ title: "Session Deleted", description: "The selected session has been deleted." });
   };
@@ -393,11 +395,11 @@ const DebateInterface = forwardRef<DebateInterfaceHandle, DebateInterfaceProps>(
             <DebateLogDisplay 
               debateLog={debateLog}
               topic={topic}
-              isLoadingAiResponse={isLoadingFeedbackAndAiTurn && userArgumentInput === ''}
+              isLoadingAiResponse={isLoadingFeedbackAndAiTurn}
             />
             <FeedbackDisplay 
-                feedback={feedback} 
-                isLoading={isLoadingFeedbackAndAiTurn && userArgumentInput !== '' && userLastTurnText !== ''}
+                feedback={lastFeedback} 
+                isLoading={isLoadingFeedbackAndAiTurn}
             />
           </div>
         </ScrollArea>

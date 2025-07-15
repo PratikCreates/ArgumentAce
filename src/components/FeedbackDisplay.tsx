@@ -1,3 +1,4 @@
+
 "use client";
 
 import type { AnalyzeArgumentOutput } from '@/types';
@@ -51,9 +52,9 @@ const FeedbackDisplay: React.FC<FeedbackDisplayProps> = ({ feedback, isLoading }
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <BotMessageSquare className="h-6 w-6 text-primary" />
-          AI Feedback
+          AI Feedback for Your Last Turn
         </CardTitle>
-        <CardDescription>Here's the AI's analysis of your argument.</CardDescription>
+        <CardDescription>Here's the AI's analysis of your most recent argument.</CardDescription>
       </CardHeader>
       <CardContent>
         <Accordion type="multiple" defaultValue={['overall-feedback', 'fallacies', 'persuasion', 'counterpoints']} className="w-full">

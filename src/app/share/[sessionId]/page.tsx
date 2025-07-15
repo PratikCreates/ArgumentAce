@@ -49,9 +49,6 @@ export default function SharedSessionPage() {
         debateLog: session.debateLog,
         researchPoints: session.researchPoints,
         juryVerdict: session.juryVerdict,
-        // The feedback on the shared session is for the *last* user turn, so we can include it.
-        // For a more complex PDF, you might want to associate feedback with each turn.
-        lastFeedback: session.feedback 
       });
     } catch (error) {
       console.error("Error generating PDF:", error);

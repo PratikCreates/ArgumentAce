@@ -9,7 +9,6 @@ export interface DebateSessionDataForPdf {
     debateLog: DebateTurn[];
     researchPoints?: string[] | null;
     juryVerdict?: JudgeDebateOutput | null;
-    lastFeedback?: AnalyzeArgumentOutput | null; // Note: This captures feedback for the *last* user turn.
 }
 
 // Color definitions (approximating theme)
@@ -33,7 +32,6 @@ export async function generateDebatePdf(sessionData: DebateSessionDataForPdf): P
     const margin = 40;
     let y = margin; // Current y position
 
-    // Helper function to add a new page if content overflows
     const checkPageBreak = (heightNeeded: number) => {
         if (y + heightNeeded > pageHeight - margin) {
             doc.addPage();
@@ -42,7 +40,7 @@ export async function generateDebatePdf(sessionData: DebateSessionDataForPdf): P
     };
     
     const addSectionTitle = (title: string) => {
-        checkPageBreak(40); // Check for enough space for the title and some content
+        checkPageBreak(40);
         y += 10;
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(16);
@@ -51,21 +49,18 @@ export async function generateDebatePdf(sessionData: DebateSessionDataForPdf): P
         y += 20;
     }
     
-    // ---- HEADER ----
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(22);
     doc.setTextColor(PRIMARY_COLOR);
     doc.text('ArgumentAce Debate Summary', pageWidth / 2, y, { align: 'center' });
     y += 25;
 
-    // ---- METADATA ----
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(11);
     doc.setTextColor(LIGHT_TEXT_COLOR);
     doc.text(`Generated on: ${new Date().toLocaleDateString()}`, margin, y);
     y += 20;
 
-    // ---- TOPIC ----
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(14);
     doc.setTextColor(TEXT_COLOR);
@@ -82,7 +77,6 @@ export async function generateDebatePdf(sessionData: DebateSessionDataForPdf): P
     doc.line(margin, y - 10, pageWidth - margin, y - 10);
     
 
-    // ---- RESEARCH POINTS ----
     if (sessionData.researchPoints && sessionData.researchPoints.length > 0) {
         addSectionTitle('Research Points');
         doc.setFont('helvetica', 'normal');
@@ -97,10 +91,79 @@ export async function generateDebatePdf(sessionData: DebateSessionDataForPdf): P
         y += 10;
     }
 
-    // ---- JURY VERDICT ----
+    if (sessionData.debateLog && sessionData.debateLog.length > 0) {
+        addSectionTitle('Debate Log & Feedback');
+        doc.setFontSize(10);
+
+        sessionData.debateLog.forEach(turn => {
+            const isUser = turn.speaker === 'user';
+            const speaker = isUser ? 'User' : 'AI Opponent';
+            const timestamp = new Date(turn.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            
+            const textLines = doc.splitTextToSize(turn.text, pageWidth - margin * 2 - 15);
+            const boxHeight = textLines.length * 12 + 25;
+            checkPageBreak(boxHeight + 20);
+
+            doc.setFillColor(isUser ? BACKGROUND_COLOR_USER : BACKGROUND_COLOR_AI);
+            doc.roundedRect(margin, y, pageWidth - margin * 2, boxHeight, 3, 3, 'F');
+            
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(TEXT_COLOR);
+            doc.text(speaker, margin + 8, y + 12);
+            
+            doc.setFont('helvetica', 'normal');
+            doc.setTextColor(LIGHT_TEXT_COLOR);
+            doc.text(timestamp, pageWidth - margin - 8, y + 12, { align: 'right' });
+            
+            doc.setTextColor(TEXT_COLOR);
+            doc.text(textLines, margin + 8, y + 28, { lineHeightFactor: 1.2 });
+            
+            y += boxHeight + 10;
+
+            // ---- Inline Feedback for User Turns ----
+            if (isUser && turn.feedback) {
+                const { fallacies, persuasionTechniques, feedback } = turn.feedback;
+                checkPageBreak(20);
+                y += 5; // Small gap before feedback box
+                
+                const addFeedbackList = (title: string, items: string[] | undefined, listType: 'fallacy' | 'persuasion') => {
+                    let content = `**${title}**\n`;
+                    if (items && items.length > 0) {
+                        items.forEach(item => content += `• ${item}\n`);
+                    } else {
+                        content += `_No specific ${listType}s identified._\n`;
+                    }
+                    return content;
+                }
+
+                let feedbackText = `**Analysis of Argument:**\n${feedback}\n\n`;
+                feedbackText += addFeedbackList('Logical Fallacies:', fallacies, 'fallacy');
+                feedbackText += '\n';
+                feedbackText += addFeedbackList('Persuasion Techniques:', persuasionTechniques, 'persuasion');
+                
+                doc.setFontSize(9);
+                doc.setTextColor(TEXT_COLOR);
+                doc.setDrawColor(LIGHT_TEXT_COLOR);
+                
+                const splitFeedback = doc.splitTextToSize(feedbackText, pageWidth - margin * 2 - 20);
+                const feedbackBoxHeight = splitFeedback.length * 9 + 20;
+                checkPageBreak(feedbackBoxHeight + 10);
+                
+                doc.setDrawColor('#cccccc');
+                doc.setFillColor('#fafafa');
+                doc.roundedRect(margin + 10, y, pageWidth - margin * 2 - 20, feedbackBoxHeight, 3, 3, 'FD');
+                
+                doc.text(splitFeedback, margin + 20, y + 12);
+                
+                y += feedbackBoxHeight + 15;
+            }
+        });
+        y += 10;
+    }
+
     if (sessionData.juryVerdict) {
         const { winner, overallAssessment, userStrengths, userWeaknesses, aiStrengths, aiWeaknesses, adviceForUser, keyMoments } = sessionData.juryVerdict;
-        addSectionTitle('Jury Verdict');
+        addSectionTitle('Final Jury Verdict');
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(10);
         doc.setTextColor(TEXT_COLOR);
@@ -139,7 +202,7 @@ export async function generateDebatePdf(sessionData: DebateSessionDataForPdf): P
                  doc.text(splitContent, margin, y);
                  y += splitContent.length * 10 + 5;
             }
-             y += 10; // Extra space after section
+             y += 10;
         };
 
         addVerdictSection('Overall Assessment:', overallAssessment);
@@ -152,83 +215,5 @@ export async function generateDebatePdf(sessionData: DebateSessionDataForPdf): P
         y += 10;
     }
 
-
-    // ---- DEBATE LOG ----
-    if (sessionData.debateLog && sessionData.debateLog.length > 0) {
-        addSectionTitle('Debate Log');
-        doc.setFontSize(10);
-
-        sessionData.debateLog.forEach(turn => {
-            const isUser = turn.speaker === 'user';
-            const speaker = isUser ? 'User' : 'AI Opponent';
-            const timestamp = new Date(turn.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-            
-            const textLines = doc.splitTextToSize(turn.text, pageWidth - margin * 2 - 15);
-            const boxHeight = textLines.length * 12 + 25; // Adjusted line height and padding
-            checkPageBreak(boxHeight + 20);
-
-            doc.setFillColor(isUser ? BACKGROUND_COLOR_USER : BACKGROUND_COLOR_AI);
-            doc.roundedRect(margin, y, pageWidth - margin * 2, boxHeight, 3, 3, 'F');
-            
-            doc.setFont('helvetica', 'bold');
-            doc.setTextColor(TEXT_COLOR);
-            doc.text(speaker, margin + 8, y + 12);
-            
-            doc.setFont('helvetica', 'normal');
-            doc.setTextColor(LIGHT_TEXT_COLOR);
-            doc.text(timestamp, pageWidth - margin - 8, y + 12, { align: 'right' });
-            
-            doc.setTextColor(TEXT_COLOR);
-            doc.text(textLines, margin + 8, y + 28, { lineHeightFactor: 1.2 });
-            
-            y += boxHeight + 10;
-        });
-        y += 10; // Add space after the last debate log entry
-    }
-
-
-    // --- Feedback on Last User Argument ---
-    if (sessionData.lastFeedback) {
-        addSectionTitle('Feedback on Last User Argument');
-        const { fallacies, persuasionTechniques, counterPoints, feedback } = sessionData.lastFeedback;
-
-        const addFeedbackList = (title: string, items: string[] | undefined) => {
-            if (items && items.length > 0) {
-                checkPageBreak(30);
-                doc.setFont('helvetica', 'bold');
-                doc.setFontSize(11);
-                doc.setTextColor(PRIMARY_COLOR);
-                doc.text(title, margin, y);
-                y += 15;
-                doc.setFont('helvetica', 'normal');
-                items.forEach(item => {
-                    const splitItem = doc.splitTextToSize(`• ${item}`, pageWidth - margin * 2 - 10);
-                    checkPageBreak(splitItem.length * 10 + 5);
-                    doc.text(splitItem, margin + 10, y);
-                    y += splitItem.length * 10 + 5;
-                });
-                y += 10;
-            }
-        };
-        
-        checkPageBreak(30);
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(11);
-        doc.setTextColor(PRIMARY_COLOR);
-        doc.text('Overall Analysis:', margin, y);
-        y += 15;
-        doc.setFont('helvetica', 'normal');
-        const splitFeedback = doc.splitTextToSize(feedback, pageWidth - margin * 2);
-        checkPageBreak(splitFeedback.length * 10 + 10);
-        doc.text(splitFeedback, margin, y);
-        y += splitFeedback.length * 10 + 10;
-        
-        addFeedbackList('Logical Fallacies Identified:', fallacies);
-        addFeedbackList('Persuasion Techniques Used:', persuasionTechniques);
-        addFeedbackList('Suggested Counterpoints:', counterPoints);
-    }
-
-
-    // ---- SAVE DOCUMENT ----
     doc.save(`ArgumentAce_Debate_${sessionData.topic.replace(/[^a-z0-9]/gi, '_')}.pdf`);
 }

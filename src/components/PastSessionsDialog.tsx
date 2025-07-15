@@ -1,3 +1,4 @@
+
 "use client";
 
 import type { DebateSession } from '@/types';
@@ -43,7 +44,6 @@ const PastSessionsDialog: React.FC<PastSessionsDialogProps> = ({
         localId: session.id,
         topic: session.topic,
         debateLog: session.debateLog,
-        feedback: session.feedback,
         researchPoints: session.researchPoints,
         juryVerdict: session.juryVerdict,
         timestamp: session.timestamp,
@@ -99,6 +99,10 @@ const PastSessionsDialog: React.FC<PastSessionsDialogProps> = ({
     return `${window.location.origin}/share/${shareId}`;
   }
 
+  const lastUserTurnWithFeedback = (session: DebateSession) => {
+    return [...session.debateLog].reverse().find(t => t.speaker === 'user' && t.feedback);
+  };
+  
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogContent className="sm:max-w-[700px]">
@@ -111,6 +115,8 @@ const PastSessionsDialog: React.FC<PastSessionsDialogProps> = ({
             <div className="space-y-3">
               {sessions.map((session) => {
                 const publicUrl = getPublicUrl(session.shareId);
+                const lastFeedbackTurn = lastUserTurnWithFeedback(session);
+
                 return (
                   <div key={session.id} className="p-3 border rounded-lg hover:bg-muted/50 transition-colors">
                     <div className="flex items-start justify-between">
@@ -183,13 +189,13 @@ const PastSessionsDialog: React.FC<PastSessionsDialogProps> = ({
                           {session.debateLog.length} Turn{session.debateLog.length === 1 ? '' : 's'}
                         </Badge>
                       )}
-                      {session.feedback && session.feedback.fallacies && session.feedback.fallacies.length > 0 && (
+                      {lastFeedbackTurn?.feedback?.fallacies && lastFeedbackTurn.feedback.fallacies.length > 0 && (
                         <Badge variant="destructive" className="text-xs">
                           <AlertCircle className="h-3 w-3 mr-1" />
-                          {session.feedback.fallacies.length} Fallac{session.feedback.fallacies.length === 1 ? 'y' : 'ies'} (last user turn)
+                          {lastFeedbackTurn.feedback.fallacies.length} Fallac{lastFeedbackTurn.feedback.fallacies.length === 1 ? 'y' : 'ies'} (last user turn)
                         </Badge>
                       )}
-                      {session.feedback && session.feedback.fallacies && session.feedback.fallacies.length === 0 && (
+                      {lastFeedbackTurn?.feedback?.fallacies && lastFeedbackTurn.feedback.fallacies.length === 0 && (
                         <Badge variant="secondary" className="text-xs bg-green-100 text-green-700 border-green-300">
                           No Fallacies (last user turn)
                         </Badge>

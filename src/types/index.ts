@@ -11,14 +11,12 @@ export interface DebateTurn {
   speaker: 'user' | 'ai';
   text: string;
   timestamp: string;
-  audioUrl?: string;
-  isGeneratingAudio?: boolean;
+  feedback?: AIAnalyzeArgumentOutput; // Feedback is now attached to each turn
 }
 
 export interface DebateSession {
   id: string; // Local session ID or public share ID
   topic: string;
-  feedback?: AIAnalyzeArgumentOutput; // Feedback for the last user turn
   debateLog: DebateTurn[];
   researchPoints?: string[];
   juryVerdict?: AIJudgeDebateOutput;

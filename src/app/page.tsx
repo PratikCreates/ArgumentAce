@@ -6,12 +6,12 @@ import { Button } from "@/components/ui/button";
 import { Download, Loader2 } from "lucide-react";
 import { useState, useRef, useCallback } from "react";
 import ArgumentAceLogo from "@/components/ArgumentAceLogo";
-import type { DebateSessionDataForPdf } from '@/lib/pdfGenerator';
+import type { DebateInterfaceHandle } from '@/components/DebateInterface';
 import { generateDebatePdf } from '@/lib/pdfGenerator';
 
 export default function Home() {
   const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
-  const debateInterfaceRef = useRef<{ getSessionData: () => DebateSessionDataForPdf }>(null);
+  const debateInterfaceRef = useRef<DebateInterfaceHandle>(null);
 
   const handleDownloadPdfClick = useCallback(async () => {
     if (!debateInterfaceRef.current) {
