@@ -9,6 +9,8 @@ export interface DebateTurn {
   speaker: 'user' | 'ai';
   text: string;
   timestamp: string;
+  audioUrl?: string;
+  isGeneratingAudio?: boolean;
 }
 
 export interface DebateSession {

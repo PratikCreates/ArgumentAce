@@ -8,6 +8,7 @@ import { analyzeArgument } from '@/ai/flows/real-time-feedback';
 import { generateCounterArgument } from '@/ai/flows/generate-counter-argument';
 import { researchTopic } from '@/ai/flows/research-topic-flow';
 import { judgeDebate } from '@/ai/flows/judge-debate-flow';
+import { textToSpeech } from '@/ai/flows/text-to-speech-flow';
 import useLocalStorage from '@/hooks/useLocalStorage';
 import { useToast } from '@/hooks/use-toast';
 
@@ -91,6 +92,27 @@ const DebateInterface: React.FC = () => {
     }
   };
 
+  const handleGenerateAudioForTurn = async (turnText: string, turnIndex: number) => {
+    try {
+      const audioResult = await textToSpeech({ text: turnText });
+      setDebateLog(prevLog => {
+        const newLog = [...prevLog];
+        newLog[turnIndex] = { ...newLog[turnIndex], audioUrl: audioResult.audioUrl, isGeneratingAudio: false };
+        return newLog;
+      });
+    } catch (error) {
+      console.error("Error generating audio:", error);
+      // Optionally show a toast, but might be too noisy.
+      // We'll just stop the loading indicator on the specific turn.
+      setDebateLog(prevLog => {
+        const newLog = [...prevLog];
+        newLog[turnIndex] = { ...newLog[turnIndex], isGeneratingAudio: false }; // Still turn off loading on error
+        return newLog;
+      });
+    }
+  };
+
+
   const handleSubmitUserTurn = async () => {
     if (!userArgumentInput.trim()) {
       toast({ title: "Argument Required", description: "Please enter your argument.", variant: "destructive" });
@@ -111,21 +133,30 @@ const DebateInterface: React.FC = () => {
     setUserArgumentInput(''); 
 
     try {
-      const feedbackResult = await analyzeArgument({ argument: newUserTurn.text, topic });
+      // Get feedback and AI text response in parallel for speed
+      const [feedbackResult, aiCounterResult] = await Promise.all([
+        analyzeArgument({ argument: newUserTurn.text, topic }),
+        generateCounterArgument({
+          topic,
+          formattedDebateHistory: updatedDebateLog.map(turn => `${turn.speaker === 'user' ? 'User' : 'AI'}: "${turn.text}"`).join('\n\n'),
+          opponentSkill: reasoningSkill
+        })
+      ]);
+      
       setFeedback(feedbackResult);
 
-      const formattedHistory = updatedDebateLog
-        .map(turn => `${turn.speaker === 'user' ? 'User' : 'AI'}: "${turn.text}"`)
-        .join('\n\n');
+      const newAiTurn: DebateTurn = { 
+        speaker: 'ai', 
+        text: aiCounterResult.counterArgument, 
+        timestamp: new Date().toISOString(),
+        isGeneratingAudio: true // Set loading state for audio
+      };
       
-      const aiCounterResult = await generateCounterArgument({
-        topic,
-        formattedDebateHistory: formattedHistory,
-        opponentSkill: reasoningSkill
-      });
-      
-      const newAiTurn: DebateTurn = { speaker: 'ai', text: aiCounterResult.counterArgument, timestamp: new Date().toISOString() };
-      setDebateLog(prevLog => [...prevLog, newAiTurn]);
+      const finalDebateLog = [...updatedDebateLog, newAiTurn];
+      setDebateLog(finalDebateLog);
+
+      // Trigger non-blocking audio generation
+      handleGenerateAudioForTurn(newAiTurn.text, finalDebateLog.length - 1);
 
     } catch (error) {
       console.error("Error processing turn:", error);
@@ -148,7 +179,7 @@ const DebateInterface: React.FC = () => {
         .join('\n\n');
       const result = await judgeDebate({ topic, formattedDebateHistory: formattedHistory });
       setJuryVerdict(result);
-    } catch (error) {
+    } catch (error)      {
       console.error("Error requesting jury verdict:", error);
       toast({ title: "Error Getting Verdict", description: "Failed to get jury verdict. Please try again.", variant: "destructive" });
     } finally {
