@@ -29,7 +29,12 @@ import { ScrollArea } from './ui/scroll-area';
 const SESSIONS_STORAGE_KEY = 'argumentAceSessions';
 const MIN_TURNS_FOR_JURY = 4; 
 
-const DebateInterface: React.FC = () => {
+interface DebateInterfaceProps {
+  isPdfCapturePhase?: boolean;
+  onTopicChange?: (topic: string) => void;
+}
+
+const DebateInterface: React.FC<DebateInterfaceProps> = ({ isPdfCapturePhase = false, onTopicChange }) => {
   const [topic, setTopic] = useState<string>('');
   const [reasoningSkill, setReasoningSkill] = useState<ReasoningSkill>('Intermediate');
   const [generatedArgument, setGeneratedArgument] = useState<string | null>(null);
@@ -52,6 +57,12 @@ const DebateInterface: React.FC = () => {
 
 
   const { toast } = useToast();
+
+  useEffect(() => {
+    if (onTopicChange) {
+      onTopicChange(topic);
+    }
+  }, [topic, onTopicChange]);
 
   const handleGenerateAiSuggestion = async () => {
     if (!topic.trim()) {
@@ -291,7 +302,7 @@ const DebateInterface: React.FC = () => {
       </header>
 
       <main className="flex-grow grid grid-cols-1 md:grid-cols-2 gap-6">
-        <ScrollArea className="h-[calc(100vh-170px)] md:h-auto">
+        <ScrollArea className={isPdfCapturePhase ? "h-auto" : "h-[calc(100vh-170px)] md:h-auto"}>
           <div className="space-y-6 pr-3">
             <ArgumentGeneratorControls
               topic={topic}
@@ -351,7 +362,7 @@ const DebateInterface: React.FC = () => {
           </div>
         </ScrollArea>
 
-        <ScrollArea className="h-[calc(100vh-170px)] md:h-auto">
+        <ScrollArea className={isPdfCapturePhase ? "h-auto" : "h-[calc(100vh-170px)] md:h-auto"}>
           <div className="space-y-6 md:sticky md:top-6 pr-1">
              <JuryVerdictDisplay
               verdict={juryVerdict}
@@ -367,6 +378,7 @@ const DebateInterface: React.FC = () => {
               debateLog={debateLog}
               topic={topic}
               isLoadingAiResponse={isLoadingFeedbackAndAiTurn && userArgumentInput === ''}
+              isPdfCapturePhase={isPdfCapturePhase}
             />
             <FeedbackDisplay 
                 feedback={feedback} 

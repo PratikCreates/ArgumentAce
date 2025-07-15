@@ -7,14 +7,16 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { User, Bot } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import React, { useEffect, useRef } from 'react';
+import { cn } from '@/lib/utils';
 
 interface DebateLogDisplayProps {
   debateLog: DebateTurn[];
   topic: string;
   isLoadingAiResponse: boolean;
+  isPdfCapturePhase?: boolean;
 }
 
-const DebateLogDisplay: React.FC<DebateLogDisplayProps> = ({ debateLog, topic, isLoadingAiResponse }) => {
+const DebateLogDisplay: React.FC<DebateLogDisplayProps> = ({ debateLog, topic, isLoadingAiResponse, isPdfCapturePhase = false }) => {
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
 
@@ -37,6 +39,17 @@ const DebateLogDisplay: React.FC<DebateLogDisplayProps> = ({ debateLog, topic, i
     );
   }
 
+  const scrollAreaClass = cn(
+    "w-full pr-4",
+    isPdfCapturePhase 
+      ? "h-auto overflow-visible" 
+      : "h-[300px] md:h-[400px]"
+  );
+  
+  const scrollAreaViewportClass = cn(
+    isPdfCapturePhase ? "overflow-visible" : ""
+  );
+
   return (
     <Card className="shadow-lg">
       <CardHeader>
@@ -44,8 +57,8 @@ const DebateLogDisplay: React.FC<DebateLogDisplayProps> = ({ debateLog, topic, i
         <CardDescription>Topic: {topic || "Not set"}</CardDescription>
       </CardHeader>
       <CardContent>
-        <ScrollArea className="h-[300px] md:h-[400px] w-full pr-4" ref={scrollAreaRef}>
-          <div ref={viewportRef} className="space-y-4">
+        <ScrollArea className={scrollAreaClass} ref={scrollAreaRef}>
+          <div ref={viewportRef} className={cn("space-y-4", scrollAreaViewportClass)}>
             {debateLog.map((turn, index) => (
               <div
                 key={index}
