@@ -32,56 +32,64 @@ export async function generateDebatePdf(sessionData: DebateSessionDataForPdf): P
     const margin = 40;
     let y = margin; // Current y position
 
+    // Store current font state to re-apply after page break
+    let currentFont = {
+        name: 'helvetica',
+        style: 'normal',
+        size: 10,
+        color: TEXT_COLOR
+    };
+
+    const setFont = (name: string, style: string, size: number, color: string) => {
+        currentFont = { name, style, size, color };
+        doc.setFont(name, style);
+        doc.setFontSize(size);
+        doc.setTextColor(color);
+    };
+
     const checkPageBreak = (heightNeeded: number) => {
         if (y + heightNeeded > pageHeight - margin) {
             doc.addPage();
             y = margin;
+            // Re-apply font styles on new page
+            setFont(currentFont.name, currentFont.style, currentFont.size, currentFont.color);
         }
     };
     
     const addSectionTitle = (title: string) => {
         checkPageBreak(40);
         y += 10;
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(16);
-        doc.setTextColor(PRIMARY_COLOR);
+        setFont('helvetica', 'bold', 16, PRIMARY_COLOR);
         doc.text(title, margin, y);
         y += 20;
     }
     
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(22);
-    doc.setTextColor(PRIMARY_COLOR);
+    // START: Document Header
+    setFont('helvetica', 'bold', 22, PRIMARY_COLOR);
     doc.text('ArgumentAce Debate Summary', pageWidth / 2, y, { align: 'center' });
     y += 25;
 
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(11);
-    doc.setTextColor(LIGHT_TEXT_COLOR);
+    setFont('helvetica', 'normal', 11, LIGHT_TEXT_COLOR);
     doc.text(`Generated on: ${new Date().toLocaleDateString()}`, margin, y);
     y += 20;
 
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(14);
-    doc.setTextColor(TEXT_COLOR);
+    setFont('helvetica', 'bold', 14, TEXT_COLOR);
     doc.text('Topic:', margin, y);
-    doc.setFont('helvetica', 'normal');
+    setFont('helvetica', 'normal', 14, TEXT_COLOR);
     const splitTopic = doc.splitTextToSize(sessionData.topic, pageWidth - margin * 2 - 40);
     doc.text(splitTopic, margin + 45, y);
-    y += (splitTopic.length * 12) + 10;
+    y += (splitTopic.length * 14) + 10;
     
-    doc.setFontSize(11);
+    setFont('helvetica', 'normal', 11, TEXT_COLOR);
     doc.text(`Skill Level: ${sessionData.reasoningSkill}`, margin, y);
     y += 20;
     doc.setDrawColor(LIGHT_TEXT_COLOR);
     doc.line(margin, y - 10, pageWidth - margin, y - 10);
-    
+    // END: Document Header
 
     if (sessionData.researchPoints && sessionData.researchPoints.length > 0) {
         addSectionTitle('Research Points');
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(10);
-        doc.setTextColor(TEXT_COLOR);
+        setFont('helvetica', 'normal', 10, TEXT_COLOR);
         sessionData.researchPoints.forEach(point => {
             const splitPoint = doc.splitTextToSize(`• ${point}`, pageWidth - margin * 2 - 10);
             checkPageBreak(splitPoint.length * 10 + 5);
@@ -93,13 +101,13 @@ export async function generateDebatePdf(sessionData: DebateSessionDataForPdf): P
 
     if (sessionData.debateLog && sessionData.debateLog.length > 0) {
         addSectionTitle('Debate Log & Feedback');
-        doc.setFontSize(10);
 
         sessionData.debateLog.forEach(turn => {
             const isUser = turn.speaker === 'user';
             const speaker = isUser ? 'User' : 'AI Opponent';
             const timestamp = new Date(turn.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
             
+            setFont('helvetica', 'normal', 10, TEXT_COLOR);
             const textLines = doc.splitTextToSize(turn.text, pageWidth - margin * 2 - 15);
             const boxHeight = textLines.length * 12 + 25;
             checkPageBreak(boxHeight + 20);
@@ -107,55 +115,60 @@ export async function generateDebatePdf(sessionData: DebateSessionDataForPdf): P
             doc.setFillColor(isUser ? BACKGROUND_COLOR_USER : BACKGROUND_COLOR_AI);
             doc.roundedRect(margin, y, pageWidth - margin * 2, boxHeight, 3, 3, 'F');
             
-            doc.setFont('helvetica', 'bold');
-            doc.setTextColor(TEXT_COLOR);
+            setFont('helvetica', 'bold', 10, TEXT_COLOR);
             doc.text(speaker, margin + 8, y + 12);
             
-            doc.setFont('helvetica', 'normal');
-            doc.setTextColor(LIGHT_TEXT_COLOR);
+            setFont('helvetica', 'normal', 9, LIGHT_TEXT_COLOR);
             doc.text(timestamp, pageWidth - margin - 8, y + 12, { align: 'right' });
             
-            doc.setTextColor(TEXT_COLOR);
+            setFont('helvetica', 'normal', 10, TEXT_COLOR);
             doc.text(textLines, margin + 8, y + 28, { lineHeightFactor: 1.2 });
             
             y += boxHeight + 10;
 
-            // ---- Inline Feedback for User Turns ----
             if (isUser && turn.feedback) {
                 const { fallacies, persuasionTechniques, feedback } = turn.feedback;
-                checkPageBreak(20);
-                y += 5; // Small gap before feedback box
                 
-                const addFeedbackList = (title: string, items: string[] | undefined, listType: 'fallacy' | 'persuasion') => {
+                const addFeedbackList = (title: string, items: string[] | undefined) => {
                     let content = `**${title}**\n`;
                     if (items && items.length > 0) {
                         items.forEach(item => content += `• ${item}\n`);
                     } else {
-                        content += `_No specific ${listType}s identified._\n`;
+                        content += `No specific items identified.\n`;
                     }
                     return content;
                 }
 
-                let feedbackText = `**Analysis of Argument:**\n${feedback}\n\n`;
-                feedbackText += addFeedbackList('Logical Fallacies:', fallacies, 'fallacy');
-                feedbackText += '\n';
-                feedbackText += addFeedbackList('Persuasion Techniques:', persuasionTechniques, 'persuasion');
+                setFont('helvetica', 'bold', 9, TEXT_COLOR);
+                doc.text('Analysis of Argument:', margin + 15, y);
+                y += 12;
+
+                setFont('helvetica', 'normal', 9, TEXT_COLOR);
+                let feedbackLines = doc.splitTextToSize(feedback, pageWidth - margin * 2 - 20);
+                checkPageBreak(feedbackLines.length * 9 + 5);
+                doc.text(feedbackLines, margin + 15, y);
+                y += feedbackLines.length * 9 + 10;
+
+                const drawFeedbackSubSection = (title: string, items: string[] | undefined) => {
+                    if (items && items.length > 0) {
+                        checkPageBreak(25);
+                        setFont('helvetica', 'bold', 9, TEXT_COLOR);
+                        doc.text(title, margin + 15, y);
+                        y += 12;
+                        setFont('helvetica', 'normal', 9, TEXT_COLOR);
+                        items.forEach(item => {
+                            const itemLines = doc.splitTextToSize(`• ${item}`, pageWidth - margin * 2 - 30);
+                            checkPageBreak(itemLines.length * 9 + 5);
+                            doc.text(itemLines, margin + 25, y);
+                            y += itemLines.length * 9 + 5;
+                        });
+                    }
+                }
                 
-                doc.setFontSize(9);
-                doc.setTextColor(TEXT_COLOR);
-                doc.setDrawColor(LIGHT_TEXT_COLOR);
-                
-                const splitFeedback = doc.splitTextToSize(feedbackText, pageWidth - margin * 2 - 20);
-                const feedbackBoxHeight = splitFeedback.length * 9 + 20;
-                checkPageBreak(feedbackBoxHeight + 10);
-                
-                doc.setDrawColor('#cccccc');
-                doc.setFillColor('#fafafa');
-                doc.roundedRect(margin + 10, y, pageWidth - margin * 2 - 20, feedbackBoxHeight, 3, 3, 'FD');
-                
-                doc.text(splitFeedback, margin + 20, y + 12);
-                
-                y += feedbackBoxHeight + 15;
+                drawFeedbackSubSection('Logical Fallacies Identified:', fallacies);
+                drawFeedbackSubSection('Persuasion Techniques Used:', persuasionTechniques);
+
+                y += 15;
             }
         });
         y += 10;
@@ -164,15 +177,10 @@ export async function generateDebatePdf(sessionData: DebateSessionDataForPdf): P
     if (sessionData.juryVerdict) {
         const { winner, overallAssessment, userStrengths, userWeaknesses, aiStrengths, aiWeaknesses, adviceForUser, keyMoments } = sessionData.juryVerdict;
         addSectionTitle('Final Jury Verdict');
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(10);
-        doc.setTextColor(TEXT_COLOR);
         
         if (winner) {
             checkPageBreak(20);
-            doc.setFont('helvetica', 'bold');
-            doc.setFontSize(12);
-            doc.setTextColor(ACCENT_COLOR);
+            setFont('helvetica', 'bold', 12, ACCENT_COLOR);
             doc.text(`Winner: ${winner.charAt(0).toUpperCase() + winner.slice(1)}`, margin, y);
             y += 20;
         }
@@ -180,15 +188,11 @@ export async function generateDebatePdf(sessionData: DebateSessionDataForPdf): P
         const addVerdictSection = (title: string, content: string[] | string | undefined) => {
             if (!content || (Array.isArray(content) && content.length === 0)) return;
             checkPageBreak(30);
-            doc.setFont('helvetica', 'bold');
-            doc.setFontSize(11);
-            doc.setTextColor(PRIMARY_COLOR);
+            setFont('helvetica', 'bold', 11, PRIMARY_COLOR);
             doc.text(title, margin, y);
             y += 15;
-            doc.setFont('helvetica', 'normal');
-            doc.setFontSize(10);
-            doc.setTextColor(TEXT_COLOR);
-
+            
+            setFont('helvetica', 'normal', 10, TEXT_COLOR);
             if (Array.isArray(content)) {
                 content.forEach(item => {
                     const splitItem = doc.splitTextToSize(`• ${item}`, pageWidth - margin * 2 - 10);
