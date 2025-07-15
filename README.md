@@ -2,7 +2,7 @@
 
 ## Elevator Pitch
 
-Never lose an argument again. ArgumentAce is your personal AI debate coach. Spar against an adaptive AI, get instant feedback on your logic, and have an AI jury declare a winner to help you build unbeatable arguments.
+Struggle to win debates? ArgumentAce is your AI-powered sparring partner. Practice against an intelligent opponent, get real-time feedback on your arguments, and let an AI jury declare a winner, helping you build persuasive, rock-solid cases on any topic.
 
 ## Key Features
 
