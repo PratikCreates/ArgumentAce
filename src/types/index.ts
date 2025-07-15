@@ -2,6 +2,8 @@
 import type { AnalyzeArgumentOutput as AIAnalyzeArgumentOutput } from '@/ai/flows/real-time-feedback';
 import type { ResearchTopicOutput as AIResearchTopicOutput } from '@/ai/flows/research-topic-flow';
 import type { JudgeDebateOutput as AIJudgeDebateOutput } from '@/ai/flows/judge-debate-flow';
+import { z } from 'genkit';
+
 
 export type ReasoningSkill = "Beginner" | "Intermediate" | "Advanced";
 
@@ -31,3 +33,18 @@ export interface DebateSession {
 export type AnalyzeArgumentOutput = AIAnalyzeArgumentOutput;
 export type ResearchTopicOutput = AIResearchTopicOutput;
 export type JudgeDebateOutput = AIJudgeDebateOutput;
+
+// Schemas and types for Text-to-Speech Flow
+export const TextToSpeechInputSchema = z.object({
+  text: z.string().describe('The text to be converted to speech.'),
+});
+export type TextToSpeechInput = z.infer<typeof TextToSpeechInputSchema>;
+
+export const TextToSpeechOutputSchema = z.object({
+  audioUrl: z
+    .string()
+    .describe(
+      "The generated audio as a data URI. Expected format: 'data:audio/wav;base64,<encoded_data>'."
+    ),
+});
+export type TextToSpeechOutput = z.infer<typeof TextToSpeechOutputSchema>;
