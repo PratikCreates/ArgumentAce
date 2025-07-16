@@ -9,6 +9,7 @@ import { generateCounterArgument } from '@/ai/flows/generate-counter-argument';
 import { researchTopic } from '@/ai/flows/research-topic-flow';
 import { judgeDebate } from '@/ai/flows/judge-debate-flow';
 import { textToSpeech } from '@/ai/flows/text-to-speech-flow';
+import { generatePoi } from '@/ai/flows/generate-poi-flow';
 import useLocalStorage from '@/hooks/useLocalStorage';
 import { useToast } from '@/hooks/use-toast';
 
@@ -20,15 +21,17 @@ import DebateLogDisplay from './DebateLogDisplay';
 import ResearchAssistantDisplay from './ResearchAssistantDisplay';
 import JuryVerdictDisplay from './JuryVerdictDisplay';
 import PastSessionsDialog from './PastSessionsDialog';
+import PoiDisplay from './PoiDisplay';
 
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { History, MessageSquareText, Save, Send, Loader2, Gavel, Scale } from 'lucide-react';
+import { History, MessageSquareText, Save, Send, Loader2, Gavel, Scale, HelpCircle } from 'lucide-react';
 import { ScrollArea } from './ui/scroll-area';
 
 const SESSIONS_STORAGE_KEY = 'argumentAceSessions';
-const MIN_TURNS_FOR_JURY = 4; 
+const MIN_TURNS_FOR_JURY = 4;
+const MIN_CHARS_FOR_POI = 150;
 
 interface DebateInterfaceProps {
   // No props needed for now
@@ -61,6 +64,10 @@ const DebateInterface = forwardRef<DebateInterfaceHandle, DebateInterfaceProps>(
   const [isLoadingFeedbackAndAiTurn, setIsLoadingFeedbackAndAiTurn] = useState<boolean>(false);
   const [isLoadingResearch, setIsLoadingResearch] = useState<boolean>(false);
   const [isLoadingJuryVerdict, setIsLoadingJuryVerdict] = useState<boolean>(false);
+  const [isLoadingPoi, setIsLoadingPoi] = useState<boolean>(false);
+  
+  const [poi, setPoi] = useState<string | null>(null);
+  const [poiResponse, setPoiResponse] = useState<string>('');
 
   const [sessions, setSessions] = useLocalStorage<DebateSession[]>(SESSIONS_STORAGE_KEY, []);
   const [isPastSessionsDialogOpen, setIsPastSessionsDialogOpen] = useState<boolean>(false);
@@ -131,8 +138,16 @@ const DebateInterface = forwardRef<DebateInterfaceHandle, DebateInterfaceProps>(
     setLastFeedback(null);
     setJuryVerdict(null);
 
-    const userTurnText = userArgumentInput;
+    let userTurnText = userArgumentInput;
+    // Append POI response if it exists
+    if (poi && poiResponse) {
+        userTurnText += `\n\n(Response to POI: "${poi}"): ${poiResponse}`;
+    }
+
     setUserArgumentInput(''); 
+    setPoi(null);
+    setPoiResponse('');
+
 
     const optimisticUserTurn: DebateTurn = { speaker: 'user', text: userTurnText, timestamp: new Date().toISOString() };
     const logWithUserTurn = [...debateLog, optimisticUserTurn];
@@ -200,6 +215,25 @@ const DebateInterface = forwardRef<DebateInterfaceHandle, DebateInterfaceProps>(
       setIsLoadingJuryVerdict(false);
     }
   };
+  
+  const handleRequestPoi = async () => {
+    if (!userArgumentInput.trim() || userArgumentInput.length < MIN_CHARS_FOR_POI) {
+        toast({ title: "Argument Too Short", description: `Please write at least ${MIN_CHARS_FOR_POI} characters before requesting a POI.`, variant: "destructive" });
+        return;
+    }
+    setIsLoadingPoi(true);
+    setPoi(null);
+    setPoiResponse('');
+    try {
+        const result = await generatePoi({ topic, userArgument: userArgumentInput });
+        setPoi(result.poiQuestion);
+    } catch (error) {
+        console.error("Error generating POI:", error);
+        toast({ title: "Error Generating POI", description: "Failed to get a POI. Please try again.", variant: "destructive" });
+    } finally {
+        setIsLoadingPoi(false);
+    }
+  }
 
 
   const handleUseAiSuggestedArgument = (argument: string) => {
@@ -221,6 +255,8 @@ const DebateInterface = forwardRef<DebateInterfaceHandle, DebateInterfaceProps>(
     setUserArgumentInput('');
     setJuryVerdict(null);
     setCurrentSessionId(null);
+    setPoi(null);
+    setPoiResponse('');
   }, [topic, reasoningSkill]);
 
 
@@ -303,6 +339,7 @@ const DebateInterface = forwardRef<DebateInterfaceHandle, DebateInterfaceProps>(
   
   const userLastTurnText = debateLog.filter(t => t.speaker === 'user').pop()?.text || "";
   const canRequestVerdict = debateLog.length >= MIN_TURNS_FOR_JURY && !isLoadingJuryVerdict && !isLoadingFeedbackAndAiTurn;
+  const canRequestPoi = userArgumentInput.length >= MIN_CHARS_FOR_POI && !poi && !isLoadingPoi;
 
   return (
     <div className="min-h-screen flex flex-col p-4 md:p-6 bg-background">
@@ -371,6 +408,16 @@ const DebateInterface = forwardRef<DebateInterfaceHandle, DebateInterfaceProps>(
                   aria-label="Your Argument Input"
                   disabled={isLoadingFeedbackAndAiTurn || isLoadingJuryVerdict}
                 />
+
+                <PoiDisplay 
+                  poi={poi}
+                  poiResponse={poiResponse}
+                  setPoiResponse={setPoiResponse}
+                  onGetPoi={handleRequestPoi}
+                  canRequestPoi={canRequestPoi}
+                  isLoadingPoi={isLoadingPoi}
+                />
+                
                 <Button 
                   onClick={handleSubmitUserTurn} 
                   disabled={isLoadingFeedbackAndAiTurn || isLoadingJuryVerdict || !userArgumentInput.trim() || !topic.trim()} 
