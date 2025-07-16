@@ -8,6 +8,7 @@ import { analyzeArgument } from '@/ai/flows/real-time-feedback';
 import { generateCounterArgument } from '@/ai/flows/generate-counter-argument';
 import { researchTopic } from '@/ai/flows/research-topic-flow';
 import { judgeDebate } from '@/ai/flows/judge-debate-flow';
+import { textToSpeech } from '@/ai/flows/text-to-speech-flow';
 import useLocalStorage from '@/hooks/useLocalStorage';
 import { useToast } from '@/hooks/use-toast';
 
@@ -133,7 +134,6 @@ const DebateInterface = forwardRef<DebateInterfaceHandle, DebateInterfaceProps>(
     const userTurnText = userArgumentInput;
     setUserArgumentInput(''); 
 
-    // Add user turn to log immediately, but without feedback yet.
     const optimisticUserTurn: DebateTurn = { speaker: 'user', text: userTurnText, timestamp: new Date().toISOString() };
     const logWithUserTurn = [...debateLog, optimisticUserTurn];
     setDebateLog(logWithUserTurn);
@@ -150,22 +150,30 @@ const DebateInterface = forwardRef<DebateInterfaceHandle, DebateInterfaceProps>(
       
       setLastFeedback(feedbackResult);
 
-      // Now update the user's turn in the log with the feedback we received
       const finalUserTurn: DebateTurn = { ...optimisticUserTurn, feedback: feedbackResult };
       
-      const newAiTurn: DebateTurn = { 
+      let newAiTurn: DebateTurn = { 
         speaker: 'ai', 
         text: aiCounterResult.counterArgument, 
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        audioUrl: undefined, // Start with no audio URL
       };
       
-      // Update the log with both the user turn's feedback and the new AI turn
       setDebateLog([...debateLog, finalUserTurn, newAiTurn]);
+
+      // Kick off TTS generation in the background, non-blocking
+      textToSpeech({ text: newAiTurn.text }).then(ttsResult => {
+        setDebateLog(currentLog => currentLog.map(turn => 
+          turn.timestamp === newAiTurn.timestamp ? { ...turn, audioUrl: ttsResult.audioUrl } : turn
+        ));
+      }).catch(ttsError => {
+        console.error("TTS generation failed:", ttsError);
+        // Optionally notify user, but don't block the flow
+      });
 
     } catch (error) {
       console.error("Error processing turn:", error);
-      // Revert the optimistic update on error
-      setDebateLog(debateLog);
+      setDebateLog(debateLog); // Revert optimistic update on primary error
       toast({ title: "Error Processing Turn", description: "Failed to get feedback or AI response. Please try again.", variant: "destructive" });
     } finally {
       setIsLoadingFeedbackAndAiTurn(false);

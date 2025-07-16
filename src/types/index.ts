@@ -1,4 +1,3 @@
-
 import type { AnalyzeArgumentOutput as AIAnalyzeArgumentOutput } from '@/ai/flows/real-time-feedback';
 import type { ResearchTopicOutput as AIResearchTopicOutput } from '@/ai/flows/research-topic-flow';
 import type { JudgeDebateOutput as AIJudgeDebateOutput } from '@/ai/flows/judge-debate-flow';
@@ -12,6 +11,7 @@ export interface DebateTurn {
   text: string;
   timestamp: string;
   feedback?: AIAnalyzeArgumentOutput; // Feedback is now attached to each turn
+  audioUrl?: string; // URL for the generated audio of the AI's speech
 }
 
 export interface DebateSession {
