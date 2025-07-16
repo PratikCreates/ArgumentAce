@@ -1,81 +1,105 @@
-# ArgumentAce: Win your next debate.
+# ArgumentAce: Your AI Debate Coach
 
-**Tagline:** Your AI Debate Coach.
+**Track Submission:** Track B: Live Simulated Mock Debates
 
-## Inspiration
+## 1. Project Overview & Inspiration
 
 In a world filled with information and diverse opinions, the ability to articulate a clear, persuasive argument is more valuable than ever. Yet, practicing for a debate, a business negotiation, or even a difficult conversation is incredibly hard. Finding a willing, unbiased sparring partner is a challenge, and professional coaching is often expensive and inaccessible.
 
-We were inspired by the idea of democratizing debate coaching. What if anyone, anywhere, could have an on-demand, intelligent partner to practice with? With the recent advancements in Large Language Models (LLMs), we saw an opportunity to create just that: **ArgumentAce**, an AI-powered sparring partner designed to help you build rock-solid arguments and master the art of persuasion.
+We were inspired by the idea of democratizing debate coaching. With the recent advancements in Large Language Models (LLMs), we saw an opportunity to create **ArgumentAce**, an AI-powered sparring partner designed to help you build rock-solid arguments and master the art of persuasion.
 
-## What it Does
+ArgumentAce is an integrated AI system that simulates full debate rounds, from preparation to judgment, providing a complete training ground for debaters of all levels.
 
-ArgumentAce is a web application that serves as a comprehensive training ground for debaters. Users can engage with the AI in a variety of ways to hone their skills:
+## 2. Core Features & Hackathon Requirements
 
-*   **AI Argument Generation:** Unsure where to start? Input a topic, and our AI generates a well-reasoned opening argument tailored to different skill levels (Beginner, Intermediate, Advanced).
-*   **Live AI Sparring Partner:** Engage in a back-and-forth debate. Submit your argument, and the AI opponent will generate a relevant, challenging counter-argument, simulating a real debate flow.
-*   **Real-time Feedback:** As you submit your arguments, the AI provides instant analysis, identifying logical fallacies (like "Straw Man" or "Ad Hominem") and highlighting the persuasive techniques you've used.
-*   **AI Jury Verdict:** At any point after a few exchanges, you can request a final verdict. An AI "jury" provides a comprehensive assessment of the debate, declaring a winner and offering detailed strengths, weaknesses, and actionable advice for both you and the AI opponent.
-*   **Session Management & Sharing:** All your practice sessions are saved to your browser's local storage. You can review past debates, see how you've improved, and even share a link to a completed debate for others to review.
+This project was built to directly address the challenge for **Track B: Live Simulated Mock Debates**. Here's a breakdown of how we met the key requirements.
 
-## How We Built It
+---
+
+### Requirement 1: Case Prep
+
+> **Challenge:** Develop an AI tool that helps debaters prepare cohesive cases for given motions.
+
+ArgumentAce provides a **Case Preparation** feature powered by the `researchTopicFlow`. When a user inputs a topic, the AI assistant generates a structured brief containing:
+*   **Arguments For (Pro Points):** 2-3 distinct, strong arguments in favor of the motion.
+*   **Arguments Against (Con Points):** 2-3 distinct, strong arguments against the motion.
+*   **Key Facts & Statistics:** 1-2 important and verifiable facts that are highly relevant to the debate.
+
+This directly assists with the initial brainstorming and structuring phase of debate preparation, fulfilling the **Case Preparation Quality (5%)** evaluation criterion.
+
+---
+
+### Requirement 2: Debating
+
+> **Challenge:** Create AI debaters with adjustable skill levels that deliver structured speeches and respond appropriately.
+
+This is the core of the ArgumentAce experience.
+*   **Adjustable Skill Levels:** The user can set the AI opponent's skill to **Beginner, Intermediate, or Advanced**. This setting is passed to our Genkit flows (`generateArgumentFlow` and `generateCounterArgumentFlow`) and directly influences the complexity, vocabulary, and reasoning style of the AI's arguments. This addresses the **Skill Level Differentiation (15%)** criterion.
+*   **Structured Speeches & Responses:** The AI doesn't just give one-line answers. It generates multi-paragraph arguments (`generateArgumentFlow`) and counter-arguments (`generateCounterArgumentFlow`) that are coherent and directly engage with the user's points. The system maintains context by feeding the entire debate history into the prompt for the AI opponent. This addresses the **AI Debate Speech Quality (15%)** and **Interactivity (5%)** criteria.
+*   **Text-to-Speech (TTS) for AI Delivery:** To better simulate a real debate environment, the AI's responses are converted to speech using Gemini's TTS model. Users can play the AI's argument aloud, adding a new layer of immersion.
+
+---
+
+### Requirement 3: Adjudicators
+
+> **Challenge:** Develop an AI judge capable of evaluating the debate and generating detailed, constructive feedback.
+
+The **AI Jury Verdict** is a standout feature designed to meet the **Judging Quality And Feedback Relevance (15%)** criterion. After a few exchanges, the user can request a verdict from our `judgeDebateFlow`.
+
+#### Adjudication Algorithm & Methodology
+
+To ensure the judging is analytical and transparent, we've designed our AI judge to follow a specific "quasi-mathematical" algorithm:
+
+1.  **Identify Key Clashes:** The AI first identifies the 2-4 main points of contention where both sides directly engaged.
+2.  **Analyze Each Clash:** For each clash, it determines a winner ('user', 'ai', or 'tie') and provides a justification.
+3.  **Assign a Score:** It assigns a score from **-5 (decisive win for AI) to +5 (decisive win for User)** for each clash. A score of 0 represents a tie.
+4.  **Calculate Final Score:** The scores from all clashes are summed to produce a final score.
+5.  **Declare Winner & Provide Feedback:** The final score determines the overall winner. The AI then provides qualitative feedback, including strengths and weaknesses for both the user and the AI, based on its clash analysis.
+
+This reductionist approach makes the AI's decision-making process clear and accessible, directly addressing the hackathon's requirement for a transparent evaluation methodology. The UI then presents this verdict in a structured and easy-to-digest format.
+
+---
+
+### Requirement 4: User Interface & Experience
+
+> **Challenge:** Provide a system with an intuitive UI for setting up sessions and reviewing feedback.
+
+We built ArgumentAce with a clean, two-panel layout using **ShadCN UI** and **Tailwind CSS**.
+*   **Left Panel (Input):** Contains controls for setting the topic, skill level, generating arguments, and writing your own responses.
+*   **Right Panel (Output):** Displays the live debate log, real-time feedback, research points, and the final jury verdict.
+*   **Session Management:** Users can save their debate sessions to local storage, review them in a "Past Sessions" dialog, and load them back to continue practicing.
+*   **Sharing & PDF Download:** Sessions can be shared via a public link, and any debate can be downloaded as a well-formatted PDF for offline review.
+
+This addresses the **User Interface (10%)** criterion.
+
+## 3. Tech Stack & Architecture
 
 ArgumentAce is built on a modern, robust, and AI-native tech stack:
 
 *   **Framework:** **Next.js (App Router)** provides a powerful foundation with Server Components and a flexible file-based routing system.
 *   **Language:** **TypeScript** ensures type safety and a more maintainable codebase.
-*   **AI Integration:** **Genkit**, an open-source framework from Google, was the core of our AI backend. It allowed us to structure our interactions with LLMs into organized, testable "flows." We used **Google's Gemini 2.0 Flash model** for all generative tasks.
+*   **AI Integration:** **Genkit**, an open-source framework from Google, was the core of our AI backend. It allowed us to structure our interactions with LLMs into organized, testable "flows." We used **Google's Gemini 2.0 Flash model** for all generative tasks and the **Gemini TTS model** for speech synthesis.
     *   `generateArgumentFlow`: Creates initial arguments.
     *   `generateCounterArgumentFlow`: Powers the AI opponent's responses.
     *   `analyzeArgumentFlow`: Provides real-time feedback on fallacies and techniques.
-    *   `judgeDebateFlow`: Acts as the impartial jury for the final verdict.
-*   **UI/UX:** We used **ShadCN UI** for its beautiful, accessible, and highly composable set of components, styled with **Tailwind CSS**. This allowed us to build a clean, professional, two-panel interface that's intuitive to use.
+    *   `judgeDebateFlow`: Acts as the impartial, analytical jury.
+    *   `researchTopicFlow`: Generates case preparation materials.
+    *   `textToSpeechFlow`: Converts AI responses to audio.
+*   **UI/UX:** We used **ShadCN UI** for its beautiful, accessible, and highly composable set of components, styled with **Tailwind CSS**.
 *   **State Management:** Client-side state is managed with React Hooks (`useState`, `useEffect`), and debate sessions are persisted in the browser using a custom `useLocalStorage` hook.
+*   **Backend Stub:** The session sharing service (`sharingService.ts`) is currently an in-memory stub.
 
-## Challenges We Ran Into
+## 4. Challenges & Learnings
 
-1.  **Prompt Engineering for Nuance:** Crafting prompts that could distinguish between a "Beginner" and "Advanced" argument, or provide fair, unbiased jury feedback, was a significant challenge. It required many iterations to get the AI to provide feedback that was consistently constructive and relevant.
+1.  **Prompt Engineering for Nuance:** Crafting prompts that could provide fair, unbiased, and *quantitative* jury feedback was a significant challenge. It required many iterations to get the AI to follow the "clash-based" scoring system reliably.
+2.  **Client-Side PDF Generation:** We learned that generating a well-structured, multi-page PDF on the client-side is far more complex than simply taking a screenshot. We had to build a custom generator using `jspdf` that manually places every element to ensure a clean, professional output.
+3.  **State Management Complexity:** Juggling the state for the debate topic, user input, debate log, AI-generated arguments, real-time feedback, and the final jury verdict across multiple components required very deliberate state management to prevent race conditions.
 
-2.  **Client-Side PDF Generation:** Our initial goal was to allow users to download a beautifully formatted PDF of their shared debate. We quickly learned that client-side PDF generation of dynamic, scrollable content is complex. Our first version had formatting and content-capturing issues. We improved it by implementing a "capture phase" that re-renders the component with an expanded layout before the PDF is generated, but achieving perfect fidelity remains a challenge.
+## 5. Future Work (Acknowledging Unmet Requirements)
 
-3.  **State Management Complexity:** Juggling the state for the debate topic, user input, debate log, AI-generated arguments, real-time feedback, and the final jury verdict across multiple components became complex. We had to be very deliberate about our state updates and effects to prevent race conditions and ensure the UI always reflected the correct state, especially during loading sequences.
+While we are proud of the prototype, we have a clear vision for what's next, which aligns with some of the more advanced hackathon requirements:
 
-## Accomplishments That We're Proud Of
-
-We are incredibly proud of creating a fully functional, end-to-end debate coaching experience. The AI jury verdict, in particular, is a feature we believe provides immense value, offering users a holistic view of their performance that goes beyond simple turn-by-turn feedback. The seamless integration of five distinct AI flows into a single, cohesive user interface feels like a major accomplishment.
-
-## What We Learned
-
-Throughout this hackathon, we learned a great deal about the practicalities of building AI-powered applications. Our biggest takeaway was the importance of **structured AI development**. Using Genkit to define schemas (with Zod) and flows forced us to think clearly about our inputs and outputs, which made the AI's behavior more predictable and our code easier to debug. We also gained a deeper appreciation for the art of prompt engineering and the challenges of managing complex application state in a reactive UI framework.
-
-## Hackathon Journal: Reflections
-
-### What is the one major problem you are facing right now? How do you plan on solving it?
-
-Our biggest challenge right now is the **persistence of shared debate sessions**. The "Share" feature is functional on the frontend, but the backend is a stub using an in-memory `Map`. This means a shared link only works for a few moments and becomes invalid if the server restarts.
-
-**Our plan to solve this is clear:** We will replace the stubbed service with a real, persistent database like **Firebase Firestore**. The plan involves rewriting our `sharingService.ts` to create and read documents from a Firestore collection, which will make our shared links robust and truly public.
-
-### What tech stack are you using and how has your workflow evolved over the past week?
-
-We are using a modern, AI-native tech stack:
-*   **Framework:** Next.js (with the App Router)
-*   **Language:** TypeScript
-*   **AI Integration:** Google's **Genkit** framework, using the **Gemini 2.0 Flash model**.
-*   **UI:** **ShadCN UI** components styled with **Tailwind CSS**.
-*   **State Management:** React Hooks and a custom `useLocalStorage` hook.
-
-Our workflow has evolved from foundational work to rapid feature iteration. Our process is now a tight loop: Ideate a feature, define the AI logic and schemas in Genkit first, build the React components, and then connect them. This structured, AI-first workflow has been incredibly effective.
-
-### What is one thing you have learned that you wish you knew at the start of this hackathon?
-
-The one thing we wish we knew at the start is **the deceptive complexity of client-side PDF generation for dynamic, scrollable content.** We initially thought adding a "Download as PDF" button would be straightforward. However, we quickly ran into issues with `html2canvas` not capturing content inside scrollable divs. We had to learn and implement a "capture phase" where we re-render the component with an expanded layout specifically for the PDF capture. It was a powerful lesson in how seemingly simple user features can hide significant implementation challenges.
-
-## What's Next for ArgumentAce
-
-This is just the beginning! We have a clear vision for the future of ArgumentAce:
-
-*   **Persistent User Accounts:** Moving beyond local storage to a full backend (like Firebase Firestore) to allow users to save their sessions to the cloud and access them from any device.
-*   **Team-Based Debates:** Allowing multiple users to join a session and debate as a team.
-*   **Voice-to-Text Input:** Integrating voice input for a more natural and fluid debate experience.
-*   **Advanced Analytics:** Creating a dashboard to track a user's progress over time, highlighting recurring logical fallacies and improvements in persuasive technique usage.
+*   **Speech-to-Text Integration:** The next major step is to implement real-time transcription to allow users to speak their arguments, which would address the **Transcription Accuracy (20%)** criterion.
+*   **Support for Specific Debate Formats (AP/BP):** We plan to add modes for different formats, with specific speaker roles (e.g., Prime Minister, Whip) and timing constraints.
+*   **Points of Information (POIs):** With voice transcription, we could implement a feature where the AI can offer context-aware POIs during a user's speech.
+*   **Persistent User Accounts:** We will replace the stubbed sharing service and `localStorage` with a full backend using **Firebase Firestore** to allow users to save sessions to the cloud.
