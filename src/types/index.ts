@@ -18,7 +18,7 @@ export interface DebateSession {
   id: string; // Local session ID or public share ID
   topic: string;
   debateLog: DebateTurn[];
-  researchPoints?: string[];
+  researchPoints?: AIResearchTopicOutput;
   juryVerdict?: AIJudgeDebateOutput;
   timestamp: string;
   reasoningSkill: ReasoningSkill;

@@ -21,15 +21,24 @@ const JudgeDebateInputSchema = z.object({
 });
 export type JudgeDebateInput = z.infer<typeof JudgeDebateInputSchema>;
 
+const ClashAnalysisSchema = z.object({
+  clashPoint: z.string().describe("A brief title for the key point of contention (e.g., 'Economic Impact', 'Ethical Concerns')."),
+  summary: z.string().describe("A summary of how this clash played out between the user and the AI."),
+  winner: z.enum(['user', 'ai', 'tie']).describe("Who won this specific point of contention."),
+  winnerScore: z.number().describe("A score from -5 (strong loss for user) to +5 (strong win for user) for this clash. 0 is a tie."),
+  reasoning: z.string().describe("The justification for why the winner was chosen for this clash."),
+});
+
 const JudgeDebateOutputSchema = z.object({
   overallAssessment: z
     .string()
     .describe("A summary of the debate and the jury's overall impression."),
+  clashes: z.array(ClashAnalysisSchema).describe("An analysis of the key clashes or points of contention in the debate."),
+  finalScore: z.number().describe("The sum of all clash scores. A positive score favors the user, negative favors the AI."),
   winner: z
     .enum(['user', 'ai', 'tie'])
-    .optional()
     .describe(
-      "The declared winner, if one can be clearly determined. Could be 'tie'."
+      "The declared winner, determined by the final score. Could be 'tie'."
     ),
   userStrengths: z
     .array(z.string())
@@ -48,12 +57,6 @@ const JudgeDebateOutputSchema = z.object({
     .array(z.string())
     .describe(
       "Areas where the AI opponent was less effective or could have improved (2-3 points)."
-    ),
-  keyMoments: z
-    .array(z.string())
-    .optional()
-    .describe(
-      "Specific points or exchanges in the debate that were particularly impactful or noteworthy (1-2 points)."
     ),
   adviceForUser: z
     .string()
@@ -74,34 +77,26 @@ const judgeDebatePrompt = ai.definePrompt({
   name: 'judgeDebatePrompt',
   input: {schema: JudgeDebateInputSchema},
   output: {schema: JudgeDebateOutputSchema},
-  prompt: `You are an impartial and experienced debate judging panel. Your task is to analyze the following debate transcript and provide a comprehensive verdict.
+  prompt: `You are an impartial and experienced debate judging panel. Your task is to analyze the following debate transcript and provide a comprehensive, analytical, and quasi-mathematical verdict.
 
 Debate Topic: "{{{topic}}}"
 
 Debate Transcript (User vs. AI):
 {{{formattedDebateHistory}}}
 
-Please evaluate the debate based on the following criteria:
-1.  **Clarity and Coherence:** How clear and well-structured were the arguments from each side?
-2.  **Relevance to Topic:** Did the arguments stay focused on the debate topic?
-3.  **Logical Reasoning:** How sound was the logic used? Were there any notable fallacies (beyond what might have been caught by per-turn feedback)?
-4.  **Strength of Rebuttals:** How effectively did each side address and counter the points made by the opponent?
-5.  **Persuasiveness:** Which side was more convincing overall?
-6.  **Use of Evidence/Support (if applicable/implied):** While direct evidence wasn't provided, assess if arguments implied strong support or relied on unsubstantiated claims.
+**Adjudication Algorithm:**
+1.  **Identify Key Clashes:** First, identify the 2-4 main points of contention ("clashes") where arguments from both sides directly engaged with each other.
+2.  **Analyze Each Clash:** For each clash:
+    a. Summarize the arguments made by the User and the AI on this point.
+    b. Determine a winner for that specific clash ('user', 'ai', or 'tie').
+    c. Assign a score from -5 (decisive win for AI) to +5 (decisive win for User). 0 represents a perfect tie or symmetric arguments.
+    d. Provide a brief reasoning for your decision on that clash.
+3.  **Calculate Final Score:** Sum the scores from all clashes to get a final numerical score.
+4.  **Declare Overall Winner:** The winner is determined by the sign of the final score (positive for User, negative for AI, zero for Tie).
+5.  **Provide Qualitative Feedback:** Based on the clash analysis, provide overall strengths and weaknesses for both the User and the AI, and offer one key piece of actionable advice for the user.
 
-Based on your evaluation, provide the following:
--   **Overall Assessment:** A summary of the debate flow, how each side performed generally.
--   **User Strengths:** List 2-3 key strengths of the user's debating.
--   **User Weaknesses:** List 2-3 key areas for improvement for the user.
--   **AI Strengths:** List 2-3 key strengths of the AI's debating.
--   **AI Weaknesses:** List 2-3 key areas where the AI opponent was less effective or could have improved.
--   **Winner (Optional):** If a clear winner emerges, state who (User or AI) or if it was a Tie. If too close to call or nuanced, explain why.
--   **Key Moments (Optional):** Identify 1-2 pivotal moments or exchanges in the debate.
--   **Advice For User:** Offer one primary piece of actionable advice for the user to improve their debating skills based on this specific debate.
-
-Be fair, balanced, and constructive in your feedback. Ensure your response strictly adheres to the JSON schema for the output.
-Do not include any introductory phrases like "Here's the verdict:" in your JSON output.
-Output only the JSON.
+**Output Generation:**
+Please fill out the structured JSON output with your complete analysis. Ensure your response strictly adheres to the JSON schema. Do not include any introductory phrases like "Here's the verdict:" in your JSON output.
 `,
 });
 
@@ -113,6 +108,7 @@ const judgeDebateFlow = ai.defineFlow(
   },
   async (input) => {
     const {output} = await judgeDebatePrompt(input);
+    // Here we could add logic to double-check the AI's math, but for now we trust the model.
     return output!;
   }
 );

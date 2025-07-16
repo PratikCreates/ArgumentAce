@@ -38,7 +38,7 @@ export interface DebateInterfaceHandle {
     topic: string;
     reasoningSkill: ReasoningSkill;
     debateLog: DebateTurn[];
-    researchPoints: string[] | null;
+    researchPoints: ResearchTopicOutput | null;
     juryVerdict: JudgeDebateOutput | null;
   };
 }
@@ -53,7 +53,7 @@ const DebateInterface = forwardRef<DebateInterfaceHandle, DebateInterfaceProps>(
   const [debateLog, setDebateLog] = useState<DebateTurn[]>([]);
   
   const [lastFeedback, setLastFeedback] = useState<AnalyzeArgumentOutput | null>(null);
-  const [researchPoints, setResearchPoints] = useState<string[] | null>(null);
+  const [researchPoints, setResearchPoints] = useState<ResearchTopicOutput | null>(null);
   const [juryVerdict, setJuryVerdict] = useState<JudgeDebateOutput | null>(null);
 
   const [isLoadingAiSuggestedArgument, setIsLoadingAiSuggestedArgument] = useState<boolean>(false);
@@ -107,7 +107,7 @@ const DebateInterface = forwardRef<DebateInterfaceHandle, DebateInterfaceProps>(
     setJuryVerdict(null); 
     try {
       const result: ResearchTopicOutput = await researchTopic({ topic });
-      setResearchPoints(result.researchPoints);
+      setResearchPoints(result);
     } catch (error) {
       console.error("Error researching topic:", error);
       toast({ title: "Error Researching Topic", description: "Failed to get research points. Please try again.", variant: "destructive" });
