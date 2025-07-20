@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect, forwardRef, useImperativeHandle } from 'react';
@@ -9,7 +8,8 @@ import {
   analyzeArgument, 
   generateCounterArgument, 
   researchTopic, 
-  judgeDebate
+  judgeDebate, 
+  // generatePoi 
 } from '@/ai/simple-flows';
 import { textToSpeech, getVoiceForRole } from '@/services/speech';
 import useLocalStorage from '@/hooks/useLocalStorage';
@@ -23,26 +23,29 @@ import DebateLogDisplay from './DebateLogDisplay';
 import ResearchAssistantDisplay from './ResearchAssistantDisplay';
 import JuryVerdictDisplay from './JuryVerdictDisplay';
 import PastSessionsDialog from './PastSessionsDialog';
-import PoiDisplay from './PoiDisplay';
 import FormatSelection from './FormatSelection';
 import AsianParliamentaryPrep from './AsianParliamentaryPrep';
 import SpeechToTextInput from './SpeechToTextInput';
+import PoiSystem from './PoiSystem';
+import SpeechTimer from './SpeechTimer';
+import DebateFlowManager from './DebateFlowManager';
+import DebateStats from './DebateStats';
 
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { History, MessageSquareText, Save, Send, Loader2, Gavel } from 'lucide-react';
-
+import { ScrollArea } from './ui/scroll-area';
 
 const SESSIONS_STORAGE_KEY = 'argumentAceSessions';
 const MIN_TURNS_FOR_JURY = 4;
-const MIN_CHARS_FOR_POI = 150;
 
-interface DebateInterfaceProps {
+interface EnhancedDebateInterfaceProps {
   initialTopic?: string;
 }
 
-export interface DebateInterfaceHandle {
+export interface EnhancedDebateInterfaceHandle {
   getSessionData: () => {
     topic: string;
     reasoningSkill: ReasoningSkill;
@@ -55,8 +58,7 @@ export interface DebateInterfaceHandle {
   };
 }
 
-
-const DebateInterface = forwardRef<DebateInterfaceHandle, DebateInterfaceProps>((props, ref) => {
+const EnhancedDebateInterface = forwardRef<EnhancedDebateInterfaceHandle, EnhancedDebateInterfaceProps>((props, ref) => {
   const [topic, setTopic] = useState<string>('');
   const [reasoningSkill, setReasoningSkill] = useState<ReasoningSkill>('Intermediate');
   const [generatedArgument, setGeneratedArgument] = useState<string | null>(null);
@@ -73,20 +75,24 @@ const DebateInterface = forwardRef<DebateInterfaceHandle, DebateInterfaceProps>(
   const [isLoadingResearch, setIsLoadingResearch] = useState<boolean>(false);
   const [isLoadingJuryVerdict, setIsLoadingJuryVerdict] = useState<boolean>(false);
 
-  
-  const [poi, setPoi] = useState<string | null>(null);
-  const [poiResponse, setPoiResponse] = useState<string>('');
-
   const [sessions, setSessions] = useLocalStorage<DebateSession[]>(SESSIONS_STORAGE_KEY, []);
   const [isPastSessionsDialogOpen, setIsPastSessionsDialogOpen] = useState<boolean>(false);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   
-  // New state for debate format
+  // Enhanced state for debate format and flow
   const [debateFormat, setDebateFormat] = useState<DebateFormat | null>(null);
-  const [showFormatSelection, setShowFormatSelection] = useState<boolean>(false);
+  const [showFormatSelection, setShowFormatSelection] = useState<boolean>(true);
   const [currentRole, setCurrentRole] = useState<string>('');
   const [prepTimeUsed, setPrepTimeUsed] = useState<number>(0);
   const [inPreparationPhase, setInPreparationPhase] = useState<boolean>(false);
+  
+  // New enhanced features
+  const [speechTimeElapsed, setSpeechTimeElapsed] = useState<number>(0);
+  const [totalDebateTime, setTotalDebateTime] = useState<number>(0);
+  const [activePoi, setActivePoi] = useState<string | null>(null);
+  const [completedSpeeches, setCompletedSpeeches] = useState<string[]>([]);
+  const [currentSpeakingRole, setCurrentSpeakingRole] = useState<string>('');
+  const [isUserSpeaking, setIsUserSpeaking] = useState<boolean>(false);
 
   const { toast } = useToast();
 
@@ -103,7 +109,7 @@ const DebateInterface = forwardRef<DebateInterfaceHandle, DebateInterfaceProps>(
     }),
   }));
 
-
+  // Enhanced handlers
   const handleGenerateAiSuggestion = async () => {
     if (!topic.trim()) {
       toast({ title: "Topic Required", description: "Please enter a debate topic.", variant: "destructive" });
@@ -156,15 +162,8 @@ const DebateInterface = forwardRef<DebateInterfaceHandle, DebateInterfaceProps>(
     setLastFeedback(null);
     setJuryVerdict(null);
 
-    let userTurnText = userArgumentInput;
-    // Append POI response if it exists
-    if (poi && poiResponse) {
-        userTurnText += `\n\n(Response to POI: "${poi}"): ${poiResponse}`;
-    }
-
+    const userTurnText = userArgumentInput;
     setUserArgumentInput(''); 
-    setPoi(null);
-    setPoiResponse('');
 
     // Create user turn with role information if available
     const optimisticUserTurn: DebateTurn = { 
@@ -189,7 +188,6 @@ const DebateInterface = forwardRef<DebateInterfaceHandle, DebateInterfaceProps>(
       // Determine AI role based on user role in Asian Parliamentary format
       let aiRole: string | undefined = undefined;
       if (debateFormat === 'asian-parliamentary' && currentRole) {
-        // Map user role to appropriate AI opponent role
         const roleMap: Record<string, string> = {
           'Prime Minister': 'Leader of Opposition',
           'Leader of Opposition': 'Deputy Prime Minister',
@@ -212,7 +210,6 @@ const DebateInterface = forwardRef<DebateInterfaceHandle, DebateInterfaceProps>(
           topic,
           formattedDebateHistory,
           opponentSkill: reasoningSkill,
-          debateFormat: debateFormat || undefined,
           userRole: currentRole || undefined,
           aiRole: aiRole || undefined
         })
@@ -226,40 +223,32 @@ const DebateInterface = forwardRef<DebateInterfaceHandle, DebateInterfaceProps>(
         speaker: 'ai', 
         text: aiCounterResult.counterArgument, 
         timestamp: new Date().toISOString(),
-        audioUrl: undefined, // Start with no audio URL
+        audioUrl: undefined,
         role: aiRole
       };
       
       setDebateLog([...debateLog, finalUserTurn, newAiTurn]);
-      
-      // Handle proactive POI if provided
-      if (aiCounterResult.poi) {
-        setPoi(aiCounterResult.poi);
-        toast({
-          title: "Point of Information!",
-          description: "The AI has a question about your argument.",
-          duration: 5000
-        });
-      }
 
-      // Kick off TTS generation in the background, non-blocking
-      const voiceConfig = getVoiceForRole(aiRole);
+      // Generate TTS for AI response
       textToSpeech({ 
         text: newAiTurn.text,
-        languageCode: voiceConfig.languageCode,
-        speaker: voiceConfig.speaker
+        voiceId: aiRole ? getVoiceForRole(aiRole) : undefined
       }).then(ttsResult => {
         setDebateLog(currentLog => currentLog.map(turn => 
           turn.timestamp === newAiTurn.timestamp ? { ...turn, audioUrl: ttsResult.audioUrl } : turn
         ));
       }).catch(ttsError => {
         console.error("TTS generation failed:", ttsError);
-        // Continue without audio - no toast notification to avoid hydration issues
+        toast({
+          title: "Audio Generation Failed",
+          description: "Could not generate audio for AI response. You can still read the text response.",
+          variant: "destructive"
+        });
       });
 
     } catch (error) {
       console.error("Error processing turn:", error);
-      setDebateLog(debateLog); // Revert optimistic update on primary error
+      setDebateLog(debateLog);
       toast({ title: "Error Processing Turn", description: "Failed to get feedback or AI response. Please try again.", variant: "destructive" });
     } finally {
       setIsLoadingFeedbackAndAiTurn(false);
@@ -274,7 +263,6 @@ const DebateInterface = forwardRef<DebateInterfaceHandle, DebateInterfaceProps>(
     setIsLoadingJuryVerdict(true);
     setJuryVerdict(null);
     try {
-      // Format debate history with roles if available
       const formattedHistory = debateLog.map(turn => {
         const speakerLabel = turn.speaker === 'user' ? 
           (turn.role ? `User (${turn.role})` : 'User') : 
@@ -285,7 +273,6 @@ const DebateInterface = forwardRef<DebateInterfaceHandle, DebateInterfaceProps>(
       const result = await judgeDebate({ 
         topic, 
         formattedDebateHistory: formattedHistory,
-        debateFormat: debateFormat || undefined,
         userRole: currentRole || undefined
       });
       
@@ -297,22 +284,26 @@ const DebateInterface = forwardRef<DebateInterfaceHandle, DebateInterfaceProps>(
       setIsLoadingJuryVerdict(false);
     }
   };
-  
-  // POI is now proactive - no manual request needed
 
-
-  const handleUseAiSuggestedArgument = (argument: string) => {
-    setUserArgumentInput(argument);
-    setGeneratedArgument(null);
-    setJuryVerdict(null);
-    toast({ title: "Argument Loaded", description: "AI suggested argument loaded for your turn." });
+  // Enhanced POI handlers
+  const handlePoiOffered = (poi: string) => {
+    setActivePoi(poi);
+    toast({ title: "POI Offered", description: "Point of Information has been offered." });
   };
 
-  const handleClearAiSuggestedArgument = () => {
-    setGeneratedArgument(null);
+  const handlePoiAccepted = (response: string) => {
+    setActivePoi(null);
+    // Add POI response to current argument
+    setUserArgumentInput(prev => prev + `\n\n[POI Response]: ${response}`);
+    toast({ title: "POI Accepted", description: "Your response has been added to your argument." });
   };
-  
-  // Handle format selection
+
+  const handlePoiDeclined = () => {
+    setActivePoi(null);
+    toast({ title: "POI Declined", description: "Point of Information was declined." });
+  };
+
+  // Format selection and preparation handlers
   const handleFormatSelected = (format: DebateFormat) => {
     setDebateFormat(format);
     setShowFormatSelection(false);
@@ -322,12 +313,13 @@ const DebateInterface = forwardRef<DebateInterfaceHandle, DebateInterfaceProps>(
     }
   };
   
-  // Handle starting debate from preparation phase
   const handleStartDebateFromPrep = (argument: string, role: string, timeUsed: number) => {
     setInPreparationPhase(false);
     setUserArgumentInput(argument);
     setCurrentRole(role);
     setPrepTimeUsed(timeUsed);
+    setCurrentSpeakingRole(role);
+    setIsUserSpeaking(true);
     
     toast({
       title: "Preparation Complete",
@@ -335,28 +327,28 @@ const DebateInterface = forwardRef<DebateInterfaceHandle, DebateInterfaceProps>(
     });
   };
 
-  useEffect(() => {
-    setResearchPoints(null);
-    setGeneratedArgument(null);
-    setLastFeedback(null);
-    setDebateLog([]);
-    setUserArgumentInput('');
-    setJuryVerdict(null);
-    setCurrentSessionId(null);
-    setPoi(null);
-    setPoiResponse('');
-    
-    // Reset format-specific state when topic changes (but don't auto-show format selection)
-    if (topic) {
-      // Only reset if we're starting completely fresh
-      setDebateFormat(null);
-      setInPreparationPhase(false);
-      setCurrentRole('');
-      setPrepTimeUsed(0);
-    }
-  }, [topic, reasoningSkill]);
+  // Speech timer handlers
+  const handleSpeechTimeUpdate = (elapsed: number) => {
+    setSpeechTimeElapsed(elapsed);
+  };
 
+  const handleSpeechComplete = () => {
+    toast({ title: "Speech Time Complete", description: "Your speaking time is up!" });
+  };
 
+  // Debate flow handlers
+  const handleRoleChange = (role: string, isUserTurn: boolean) => {
+    setCurrentSpeakingRole(role);
+    setIsUserSpeaking(isUserTurn);
+    setSpeechTimeElapsed(0); // Reset speech timer for new speaker
+  };
+
+  const handleSpeechCompleted = (role: string) => {
+    setCompletedSpeeches(prev => [...prev, role]);
+    toast({ title: "Speech Completed", description: `${role} speech has been completed.` });
+  };
+
+  // Session management
   const handleSaveSession = () => {
     if (!topic.trim() && debateLog.length === 0) {
       toast({ title: "Nothing to Save", description: "Please enter a topic or start the debate before saving.", variant: "destructive" });
@@ -366,7 +358,7 @@ const DebateInterface = forwardRef<DebateInterfaceHandle, DebateInterfaceProps>(
     const existingSessionIndex = currentSessionId ? sessions.findIndex(s => s.id === currentSessionId) : -1;
     let newSession: DebateSession;
 
-    if (existingSessionIndex > -1) { // Update existing session
+    if (existingSessionIndex > -1) {
       newSession = {
         ...sessions[existingSessionIndex],
         topic,
@@ -383,7 +375,7 @@ const DebateInterface = forwardRef<DebateInterfaceHandle, DebateInterfaceProps>(
       updatedSessions[existingSessionIndex] = newSession;
       setSessions(updatedSessions.sort((a,b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()));
       toast({ title: "Session Updated!", description: "Your current debate session has been updated." });
-    } else { // Create new session
+    } else {
       newSession = {
         id: Date.now().toString(),
         topic,
@@ -413,11 +405,10 @@ const DebateInterface = forwardRef<DebateInterfaceHandle, DebateInterfaceProps>(
     setGeneratedArgument(null); 
     setLastFeedback(session.debateLog.filter(t => t.speaker === 'user').pop()?.feedback || null);
     
-    // Restore format-specific state
     if (session.format) {
       setDebateFormat(session.format);
       setShowFormatSelection(false);
-      setInPreparationPhase(false); // Always load directly into debate mode for saved sessions
+      setInPreparationPhase(false);
     }
     
     if (session.currentRole) {
@@ -458,24 +449,41 @@ const DebateInterface = forwardRef<DebateInterfaceHandle, DebateInterfaceProps>(
       setSessions(newSessions);
     }
   };
-  
+
+  // Reset state when topic changes
+  useEffect(() => {
+    setResearchPoints(null);
+    setGeneratedArgument(null);
+    setLastFeedback(null);
+    setDebateLog([]);
+    setUserArgumentInput('');
+    setJuryVerdict(null);
+    setCurrentSessionId(null);
+    setActivePoi(null);
+    setCompletedSpeeches([]);
+    setSpeechTimeElapsed(0);
+    setTotalDebateTime(0);
+    
+    if (topic) {
+      setShowFormatSelection(true);
+      setDebateFormat(null);
+      setInPreparationPhase(false);
+      setCurrentRole('');
+      setPrepTimeUsed(0);
+    }
+  }, [topic, reasoningSkill]);
+
   const canRequestVerdict = debateLog.length >= MIN_TURNS_FOR_JURY && !isLoadingJuryVerdict && !isLoadingFeedbackAndAiTurn;
 
   // Render different content based on the current state
   const renderContent = () => {
-    // If format selection hasn't been triggered yet, show topic input and setup
-    if (!showFormatSelection && !debateFormat) {
+    if (!topic.trim()) {
       return (
         <div className="flex-grow flex items-center justify-center">
           <Card className="w-full max-w-2xl shadow-lg">
             <CardHeader>
               <CardTitle>Start a New Debate</CardTitle>
-              <CardDescription>
-                {!topic.trim() 
-                  ? "Enter a topic to begin your debate session."
-                  : "Choose your difficulty level and click 'Let's Go' to proceed."
-                }
-              </CardDescription>
+              <CardDescription>Enter a topic to begin your debate session.</CardDescription>
             </CardHeader>
             <CardContent>
               <ArgumentGeneratorControls
@@ -487,8 +495,6 @@ const DebateInterface = forwardRef<DebateInterfaceHandle, DebateInterfaceProps>(
                 onResearchTopic={handleResearchTopic}
                 isLoadingArgument={isLoadingAiSuggestedArgument}
                 isLoadingResearch={isLoadingResearch}
-                showLetsGoButton={topic.trim().length > 0}
-                onLetsGo={() => setShowFormatSelection(true)}
               />
             </CardContent>
           </Card>
@@ -496,12 +502,10 @@ const DebateInterface = forwardRef<DebateInterfaceHandle, DebateInterfaceProps>(
       );
     }
     
-    // If user clicked "Let's Go", show format selection
-    if (showFormatSelection && !debateFormat) {
+    if (showFormatSelection) {
       return <FormatSelection onFormatSelected={handleFormatSelected} />;
     }
     
-    // If in Asian Parliamentary preparation phase
     if (debateFormat === 'asian-parliamentary' && inPreparationPhase) {
       return (
         <AsianParliamentaryPrep
@@ -513,180 +517,204 @@ const DebateInterface = forwardRef<DebateInterfaceHandle, DebateInterfaceProps>(
       );
     }
     
-    // Default debate interface - Improved layout with better focus
+    // Enhanced debate interface with tabs
     return (
       <div className="flex-grow">
-        {/* Main Content Area */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-6 h-full">
+        <Tabs defaultValue="debate" className="w-full">
+          <TabsList className="grid w-full grid-cols-4">
+            <TabsTrigger value="debate">Debate</TabsTrigger>
+            <TabsTrigger value="flow">Flow</TabsTrigger>
+            <TabsTrigger value="stats">Statistics</TabsTrigger>
+            <TabsTrigger value="timer">Timer</TabsTrigger>
+          </TabsList>
           
-          {/* Left Column - Primary Input Area */}
-          <div className="lg:col-span-2 space-y-4 lg:space-y-6">
-            
-            {/* Topic and Format Info */}
-            {debateFormat && (
-              <Card className="shadow-sm bg-primary/5 border-primary/20">
-                <CardContent className="py-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <span className="text-sm font-medium text-primary">Topic:</span>
-                      <span className="text-sm font-semibold">{topic}</span>
-                    </div>
-                    <div className="flex items-center gap-4">
-                      <span className="text-xs text-muted-foreground">
-                        {debateFormat === 'asian-parliamentary' ? 'Asian Parliamentary' : 
-                         debateFormat === 'british-parliamentary' ? 'British Parliamentary' : 'Standard'}
-                      </span>
-                      {currentRole && (
-                        <div className="bg-primary/15 px-2 py-1 rounded text-xs font-medium text-primary">
-                          {currentRole}
+          <TabsContent value="debate" className="space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <ScrollArea className="h-[calc(100vh-200px)]">
+                <div className="space-y-6 pr-3">
+                  <ArgumentGeneratorControls
+                    topic={topic}
+                    setTopic={setTopic}
+                    reasoningSkill={reasoningSkill}
+                    setReasoningSkill={setReasoningSkill}
+                    onGenerateArgument={handleGenerateAiSuggestion}
+                    onResearchTopic={handleResearchTopic}
+                    isLoadingArgument={isLoadingAiSuggestedArgument}
+                    isLoadingResearch={isLoadingResearch}
+                  />
+
+                  {debateFormat && (
+                    <Card className="shadow-lg bg-primary/5">
+                      <CardContent className="pt-4 pb-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium">Format:</span>
+                            <span>{debateFormat === 'asian-parliamentary' ? 'Asian Parliamentary' : 
+                                   debateFormat === 'british-parliamentary' ? 'British Parliamentary' : 'Standard'}</span>
+                          </div>
+                          {currentRole && (
+                            <div className="bg-primary/10 px-3 py-1 rounded-full text-sm font-medium">
+                              Role: {currentRole}
+                            </div>
+                          )}
                         </div>
-                      )}
-                    </div>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  <ArgumentDisplay
+                    generatedArgument={generatedArgument}
+                    isLoading={isLoadingAiSuggestedArgument}
+                    onUseArgument={(argument) => {
+                      setUserArgumentInput(argument);
+                      setGeneratedArgument(null);
+                      toast({ title: "Argument Loaded", description: "AI suggested argument loaded for your turn." });
+                    }}
+                    onRegenerate={handleGenerateAiSuggestion}
+                    onClearArgument={() => setGeneratedArgument(null)}
+                    topic={topic}
+                  />
+
+                  <Card className="shadow-lg">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <MessageSquareText className="h-6 w-6 text-primary" />
+                        {debateLog.length > 0 ? "Your Next Argument / Rebuttal" : "Your Opening Argument"}
+                      </CardTitle>
+                      <CardDescription>
+                        {debateLog.length > 0 
+                          ? "Respond to the AI or make your next point." 
+                          : "Enter your opening argument here, or use an AI suggestion."}
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <Textarea
+                        placeholder="Type your argument here..."
+                        value={userArgumentInput}
+                        onChange={(e) => setUserArgumentInput(e.target.value)}
+                        className="min-h-[150px] md:min-h-[200px] text-base"
+                        aria-label="Your Argument Input"
+                        disabled={isLoadingFeedbackAndAiTurn || isLoadingJuryVerdict}
+                      />
+                      
+                      <div className="flex justify-between items-center mt-2">
+                        <SpeechToTextInput 
+                          onTranscriptionComplete={(text) => {
+                            if (userArgumentInput.trim()) {
+                              setUserArgumentInput(prev => `${prev}\n\n${text}`);
+                            } else {
+                              setUserArgumentInput(text);
+                            }
+                            toast({
+                              title: "Speech Transcribed",
+                              description: "Your speech has been added to the argument."
+                            });
+                          }}
+                          isDisabled={isLoadingFeedbackAndAiTurn || isLoadingJuryVerdict}
+                        />
+                      </div>
+                      
+                      <Button 
+                        onClick={handleSubmitUserTurn} 
+                        disabled={isLoadingFeedbackAndAiTurn || isLoadingJuryVerdict || !userArgumentInput.trim() || !topic.trim()} 
+                        className="mt-4 w-full"
+                      >
+                        {isLoadingFeedbackAndAiTurn ? (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        ) : (
+                          <Send className="mr-2 h-4 w-4" />
+                        )}
+                        {debateLog.length > 0 ? "Send Rebuttal & Get AI Response" : "Submit Argument & Get AI Response"}
+                      </Button>
+                    </CardContent>
+                  </Card>
+                </div>
+              </ScrollArea>
+
+              <ScrollArea className="h-[calc(100vh-200px)]">
+                <div className="space-y-6 pr-1">
+                  <JuryVerdictDisplay
+                    verdict={juryVerdict}
+                    isLoading={isLoadingJuryVerdict}
+                    topic={topic}
+                  />
+                  <ResearchAssistantDisplay 
+                    researchPoints={researchPoints}
+                    isLoading={isLoadingResearch}
+                    topic={topic}
+                  />
+                  <DebateLogDisplay 
+                    debateLog={debateLog}
+                    topic={topic}
+                    isLoadingAiResponse={isLoadingFeedbackAndAiTurn}
+                  />
+                  <FeedbackDisplay 
+                    feedback={lastFeedback} 
+                    isLoading={isLoadingFeedbackAndAiTurn}
+                  />
+                </div>
+              </ScrollArea>
+            </div>
+          </TabsContent>
+          
+          <TabsContent value="flow" className="space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <DebateFlowManager
+                currentUserRole={currentRole}
+                onRoleChange={handleRoleChange}
+                completedSpeeches={completedSpeeches}
+                onSpeechComplete={handleSpeechCompleted}
+              />
+              <PoiSystem
+                isActive={isUserSpeaking}
+                currentRole={currentSpeakingRole}
+                speechTimeElapsed={speechTimeElapsed}
+                onPoiOffered={handlePoiOffered}
+                onPoiAccepted={handlePoiAccepted}
+                onPoiDeclined={handlePoiDeclined}
+                activePoi={activePoi || undefined}
+              />
+            </div>
+          </TabsContent>
+          
+          <TabsContent value="stats" className="space-y-6">
+            <DebateStats
+              debateLog={debateLog}
+              prepTimeUsed={prepTimeUsed}
+              currentRole={currentRole}
+              format={debateFormat === 'asian-parliamentary' ? 'Asian Parliamentary' : debateFormat || 'Standard'}
+              totalDebateTime={totalDebateTime}
+            />
+          </TabsContent>
+          
+          <TabsContent value="timer" className="space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <SpeechTimer
+                maxDuration={currentRole?.includes('Reply') ? 240 : 420} // 4 or 7 minutes
+                role={currentSpeakingRole}
+                onTimeUpdate={handleSpeechTimeUpdate}
+                onComplete={handleSpeechComplete}
+                isActive={isUserSpeaking}
+              />
+              <Card className="shadow-lg">
+                <CardHeader>
+                  <CardTitle>Timer Instructions</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="text-sm space-y-2">
+                    <p><strong>Substantive Speeches:</strong> 7 minutes</p>
+                    <p><strong>Reply Speeches:</strong> 4 minutes</p>
+                    <p><strong>POI Time:</strong> Minutes 1-6 of substantive speeches</p>
+                    <p><strong>Protected Time:</strong> First and last minute of each speech</p>
                   </div>
                 </CardContent>
               </Card>
-            )}
-
-            {/* Main Argument Input */}
-            <Card className="shadow-lg">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <MessageSquareText className="h-6 w-6 text-primary" />
-                  {debateLog.length > 0 ? "Your Next Argument" : "Your Opening Argument"}
-                </CardTitle>
-                <CardDescription>
-                  {debateLog.length > 0 
-                    ? "Respond to the AI's argument with your rebuttal." 
-                    : "Start the debate with your opening argument."}
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Textarea
-                  placeholder="Type your argument here..."
-                  value={userArgumentInput}
-                  onChange={(e) => setUserArgumentInput(e.target.value)}
-                  className="min-h-[200px] text-base resize-none"
-                  aria-label="Your Argument Input"
-                  disabled={isLoadingFeedbackAndAiTurn || isLoadingJuryVerdict}
-                />
-                
-                <div className="flex justify-between items-center mt-3">
-                  <SpeechToTextInput 
-                    onTranscriptionComplete={(text) => {
-                      if (userArgumentInput.trim()) {
-                        setUserArgumentInput(prev => `${prev}\n\n${text}`);
-                      } else {
-                        setUserArgumentInput(text);
-                      }
-                      toast({
-                        title: "Speech Transcribed",
-                        description: "Your speech has been added to the argument."
-                      });
-                    }}
-                    isDisabled={isLoadingFeedbackAndAiTurn || isLoadingJuryVerdict}
-                  />
-                  
-                  <div className="text-xs text-muted-foreground">
-                    {userArgumentInput.length} characters
-                  </div>
-                </div>
-
-                {poi && (
-                  <PoiDisplay 
-                    poi={poi}
-                    poiResponse={poiResponse}
-                    setPoiResponse={setPoiResponse}
-                    onGetPoi={() => {}}
-                    canRequestPoi={false}
-                    isLoadingPoi={false}
-                    isProactive={true}
-                  />
-                )}
-                
-                <Button 
-                  onClick={handleSubmitUserTurn} 
-                  disabled={isLoadingFeedbackAndAiTurn || isLoadingJuryVerdict || !userArgumentInput.trim() || !topic.trim()} 
-                  className="mt-4 w-full h-12 text-base font-medium"
-                  size="lg"
-                >
-                  {isLoadingFeedbackAndAiTurn ? (
-                    <>
-                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                      Processing...
-                    </>
-                  ) : (
-                    <>
-                      <Send className="mr-2 h-5 w-5" />
-                      {debateLog.length > 0 ? "Send Rebuttal" : "Start Debate"}
-                    </>
-                  )}
-                </Button>
-              </CardContent>
-            </Card>
-
-            {/* AI Argument Suggestion - Only show when no debate has started */}
-            {debateLog.length === 0 && (
-              <>
-                <ArgumentGeneratorControls
-                  topic={topic}
-                  setTopic={setTopic}
-                  reasoningSkill={reasoningSkill}
-                  setReasoningSkill={setReasoningSkill}
-                  onGenerateArgument={handleGenerateAiSuggestion}
-                  onResearchTopic={handleResearchTopic}
-                  isLoadingArgument={isLoadingAiSuggestedArgument}
-                  isLoadingResearch={isLoadingResearch}
-                />
-
-                <ArgumentDisplay
-                  generatedArgument={generatedArgument}
-                  isLoading={isLoadingAiSuggestedArgument}
-                  onUseArgument={handleUseAiSuggestedArgument}
-                  onRegenerate={handleGenerateAiSuggestion}
-                  onClearArgument={handleClearAiSuggestedArgument}
-                  topic={topic}
-                />
-              </>
-            )}
-          </div>
-
-          {/* Right Column - Feedback and History */}
-          <div className="space-y-4 lg:space-y-6">
-            <DebateLogDisplay 
-              debateLog={debateLog}
-              topic={topic}
-              isLoadingAiResponse={isLoadingFeedbackAndAiTurn}
-            />
-            
-            {lastFeedback && (
-              <FeedbackDisplay 
-                feedback={lastFeedback} 
-                isLoading={isLoadingFeedbackAndAiTurn}
-              />
-            )}
-            
-            {juryVerdict && (
-              <JuryVerdictDisplay
-                verdict={juryVerdict}
-                isLoading={isLoadingJuryVerdict}
-                topic={topic}
-              />
-            )}
-            
-            {researchPoints && (
-              <ResearchAssistantDisplay 
-                researchPoints={researchPoints}
-                isLoading={isLoadingResearch}
-                topic={topic}
-              />
-            )}
-          </div>
-        </div>
+            </div>
+          </TabsContent>
+        </Tabs>
       </div>
     );
   };
-
-
 
   return (
     <div className="min-h-screen flex flex-col p-4 md:p-6 bg-background">
@@ -730,6 +758,6 @@ const DebateInterface = forwardRef<DebateInterfaceHandle, DebateInterfaceProps>(
   );
 });
 
-DebateInterface.displayName = "DebateInterface";
+EnhancedDebateInterface.displayName = "EnhancedDebateInterface";
 
-export default DebateInterface;
+export default EnhancedDebateInterface;

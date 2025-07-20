@@ -189,18 +189,18 @@ const PastSessionsDialog: React.FC<PastSessionsDialogProps> = ({
                           {session.debateLog.length} Turn{session.debateLog.length === 1 ? '' : 's'}
                         </Badge>
                       )}
-                      {lastFeedbackTurn?.feedback?.fallacies && lastFeedbackTurn.feedback.fallacies.length > 0 && (
+                      {lastFeedbackTurn?.feedback?.logicalFallacies && lastFeedbackTurn.feedback.logicalFallacies.length > 0 && (
                         <Badge variant="destructive" className="text-xs">
                           <AlertCircle className="h-3 w-3 mr-1" />
-                          {lastFeedbackTurn.feedback.fallacies.length} Fallac{lastFeedbackTurn.feedback.fallacies.length === 1 ? 'y' : 'ies'} (last user turn)
+                          {lastFeedbackTurn.feedback.logicalFallacies.length} Fallac{lastFeedbackTurn.feedback.logicalFallacies.length === 1 ? 'y' : 'ies'} (last user turn)
                         </Badge>
                       )}
-                      {lastFeedbackTurn?.feedback?.fallacies && lastFeedbackTurn.feedback.fallacies.length === 0 && (
+                      {lastFeedbackTurn?.feedback?.logicalFallacies && lastFeedbackTurn.feedback.logicalFallacies.length === 0 && (
                         <Badge variant="secondary" className="text-xs bg-green-100 text-green-700 border-green-300">
                           No Fallacies (last user turn)
                         </Badge>
                       )}
-                      {session.researchPoints && session.researchPoints.length > 0 && (
+                      {session.researchPoints && (session.researchPoints.proPoints.length > 0 || session.researchPoints.conPoints.length > 0) && (
                         <Badge variant="outline" className="text-xs">
                           <BookOpen className="h-3 w-3 mr-1" />
                           Researched

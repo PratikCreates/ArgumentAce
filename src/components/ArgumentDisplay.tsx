@@ -96,12 +96,15 @@ const ArgumentDisplay: React.FC<ArgumentDisplayProps> = ({
         <CardDescription>Here's a starting point from the AI. You can use it, edit it, or write your own.</CardDescription>
       </CardHeader>
       <CardContent>
-        <Textarea
-          value={generatedArgument}
-          readOnly
-          className="min-h-[150px] bg-secondary/30"
-          aria-label="AI Generated Argument"
-        />
+        <div className="bg-secondary/30 p-4 rounded-md border min-h-[150px]">
+          <div className="prose prose-sm max-w-none">
+            {generatedArgument.split('\n').filter(line => line.trim()).map((paragraph, index) => (
+              <p key={index} className="mb-3 text-sm leading-relaxed text-foreground">
+                {paragraph.trim()}
+              </p>
+            ))}
+          </div>
+        </div>
         <div className="mt-4 flex flex-wrap gap-2">
           <Button onClick={() => onUseArgument(generatedArgument)} variant="default">
             <Edit3 className="mr-2 h-4 w-4" /> Use & Edit This

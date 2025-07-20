@@ -62,40 +62,51 @@ const ResearchAssistantDisplay: React.FC<ResearchAssistantDisplayProps> = ({
         </CardTitle>
         <CardDescription>For the topic: "{topic}"</CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4">
-        <div>
-          <h4 className="font-semibold flex items-center gap-2 mb-2 text-green-700">
+      <CardContent className="space-y-5">
+        <div className="bg-green-50 p-4 rounded-lg border border-green-200">
+          <h4 className="font-semibold flex items-center gap-2 mb-3 text-green-800">
             <ThumbsUp className="h-5 w-5" />
-            Arguments For (Pro)
+            Supporting Arguments
           </h4>
-          <ul className="space-y-2 list-disc pl-5 text-sm">
+          <div className="space-y-2">
             {researchPoints.proPoints.map((point, index) => (
-              <li key={`pro-${index}`}>{point}</li>
+              <div key={`pro-${index}`} className="flex items-start gap-2">
+                <div className="w-2 h-2 rounded-full bg-green-500 mt-2 flex-shrink-0"></div>
+                <p className="text-sm text-green-900 leading-relaxed">{point}</p>
+              </div>
             ))}
-          </ul>
+          </div>
         </div>
-        <div>
-          <h4 className="font-semibold flex items-center gap-2 mb-2 text-red-700">
+        
+        <div className="bg-red-50 p-4 rounded-lg border border-red-200">
+          <h4 className="font-semibold flex items-center gap-2 mb-3 text-red-800">
             <ThumbsDown className="h-5 w-5" />
-            Arguments Against (Con)
+            Opposing Arguments
           </h4>
-          <ul className="space-y-2 list-disc pl-5 text-sm">
+          <div className="space-y-2">
             {researchPoints.conPoints.map((point, index) => (
-              <li key={`con-${index}`}>{point}</li>
+              <div key={`con-${index}`} className="flex items-start gap-2">
+                <div className="w-2 h-2 rounded-full bg-red-500 mt-2 flex-shrink-0"></div>
+                <p className="text-sm text-red-900 leading-relaxed">{point}</p>
+              </div>
             ))}
-          </ul>
+          </div>
         </div>
+        
         {researchPoints.keyFacts && researchPoints.keyFacts.length > 0 && (
-           <div>
-             <h4 className="font-semibold flex items-center gap-2 mb-2 text-blue-700">
+           <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+             <h4 className="font-semibold flex items-center gap-2 mb-3 text-blue-800">
                 <FileText className="h-5 w-5" />
-                Key Facts & Statistics
+                Key Facts & Evidence
              </h4>
-             <ul className="space-y-2 list-disc pl-5 text-sm">
-                {researchPoints.keyFacts.map((point, index) => (
-                  <li key={`fact-${index}`}>{point}</li>
+             <div className="space-y-2">
+                {researchPoints.keyFacts.map((fact, index) => (
+                  <div key={`fact-${index}`} className="flex items-start gap-2">
+                    <div className="w-2 h-2 rounded-full bg-blue-500 mt-2 flex-shrink-0"></div>
+                    <p className="text-sm text-blue-900 leading-relaxed">{fact}</p>
+                  </div>
                 ))}
-             </ul>
+             </div>
            </div>
         )}
       </CardContent>

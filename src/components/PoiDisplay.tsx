@@ -14,6 +14,7 @@ interface PoiDisplayProps {
   onGetPoi: () => void;
   canRequestPoi: boolean;
   isLoadingPoi: boolean;
+  isProactive?: boolean;
 }
 
 const PoiDisplay: React.FC<PoiDisplayProps> = ({
@@ -23,23 +24,26 @@ const PoiDisplay: React.FC<PoiDisplayProps> = ({
   onGetPoi,
   canRequestPoi,
   isLoadingPoi,
+  isProactive = false,
 }) => {
   return (
     <div className="mt-4">
-      <Button
-        variant="outline"
-        onClick={onGetPoi}
-        disabled={!canRequestPoi || isLoadingPoi}
-        className="w-full"
-        title={!canRequestPoi && !isLoadingPoi ? "Write more to enable POIs" : "Request a Point of Information"}
-      >
-        {isLoadingPoi ? (
-          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-        ) : (
-          <HelpCircle className="mr-2 h-4 w-4" />
-        )}
-        Challenge me with a POI
-      </Button>
+      {!isProactive && (
+        <Button
+          variant="outline"
+          onClick={onGetPoi}
+          disabled={!canRequestPoi || isLoadingPoi}
+          className="w-full"
+          title={!canRequestPoi && !isLoadingPoi ? "Write more to enable POIs" : "Request a Point of Information"}
+        >
+          {isLoadingPoi ? (
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+          ) : (
+            <HelpCircle className="mr-2 h-4 w-4" />
+          )}
+          Challenge me with a POI
+        </Button>
+      )}
 
       {isLoadingPoi && (
          <Card className="mt-4 border-dashed">
@@ -56,17 +60,20 @@ const PoiDisplay: React.FC<PoiDisplayProps> = ({
       )}
 
       {poi && !isLoadingPoi && (
-        <Card className="mt-4 bg-secondary/50">
+        <Card className={`mt-4 ${isProactive ? 'bg-yellow-50 border-yellow-200' : 'bg-secondary/50'}`}>
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
               <HelpCircle className="h-5 w-5 text-accent" />
-              Point of Information
+              {isProactive ? 'Point of Information!' : 'Point of Information'}
             </CardTitle>
-            <CardDescription>The AI opponent asks: "{poi}"</CardDescription>
+            <CardDescription>
+              {isProactive ? 'The AI opponent interrupts with a question: ' : 'The AI opponent asks: '}
+              "{poi}"
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <Textarea
-              placeholder="Your response to the POI..."
+              placeholder={isProactive ? "Your response to this interruption..." : "Your response to the POI..."}
               value={poiResponse}
               onChange={(e) => setPoiResponse(e.target.value)}
               aria-label="Your response to the Point of Information"

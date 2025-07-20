@@ -133,8 +133,17 @@ const JuryVerdictDisplay: React.FC<JuryVerdictDisplayProps> = ({ verdict, isLoad
         </div>
 
         <div>
-          <h4 className="font-semibold text-lg mb-2 flex items-center gap-2"><Lightbulb className="h-5 w-5 text-primary-foreground bg-primary p-0.5 rounded-sm"/>Overall Assessment</h4>
-          <p className="text-sm text-muted-foreground bg-secondary/30 p-3 rounded-md">{verdict.overallAssessment}</p>
+          <h4 className="font-semibold text-lg mb-2 flex items-center gap-2">
+            <Lightbulb className="h-5 w-5 text-primary-foreground bg-primary p-0.5 rounded-sm"/>
+            Overall Assessment
+          </h4>
+          <div className="bg-secondary/30 p-4 rounded-md space-y-2">
+            {verdict.overallAssessment.split('\n').filter(line => line.trim()).map((paragraph, index) => (
+              <p key={index} className="text-sm text-muted-foreground leading-relaxed">
+                {paragraph.trim()}
+              </p>
+            ))}
+          </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

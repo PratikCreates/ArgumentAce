@@ -21,6 +21,8 @@ interface ArgumentGeneratorControlsProps {
   onResearchTopic: () => void;
   isLoadingArgument: boolean;
   isLoadingResearch: boolean;
+  showLetsGoButton?: boolean;
+  onLetsGo?: () => void;
 }
 
 const ArgumentGeneratorControls: React.FC<ArgumentGeneratorControlsProps> = ({
@@ -32,6 +34,8 @@ const ArgumentGeneratorControls: React.FC<ArgumentGeneratorControlsProps> = ({
   onResearchTopic,
   isLoadingArgument,
   isLoadingResearch,
+  showLetsGoButton = false,
+  onLetsGo,
 }) => {
   const [isSuggestingTopics, setIsSuggestingTopics] = useState(false);
   const [suggestedTopics, setSuggestedTopics] = useState<string[]>([]);
@@ -129,24 +133,39 @@ const ArgumentGeneratorControls: React.FC<ArgumentGeneratorControlsProps> = ({
             </SelectContent>
           </Select>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-          <Button onClick={onResearchTopic} disabled={isLoadingResearch || !topic || isLoadingArgument} variant="outline">
-            {isLoadingResearch ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <BookOpenCheck className="mr-2 h-4 w-4" />
-            )}
-            Research Topic
-          </Button>
-          <Button onClick={onGenerateArgument} disabled={isLoadingArgument || !topic || isLoadingResearch}>
-            {isLoadingArgument ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <Sparkles className="mr-2 h-4 w-4" />
-            )}
-            Generate AI Argument
-          </Button>
-        </div>
+        {!showLetsGoButton && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <Button onClick={onResearchTopic} disabled={isLoadingResearch || !topic || isLoadingArgument} variant="outline">
+              {isLoadingResearch ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <BookOpenCheck className="mr-2 h-4 w-4" />
+              )}
+              Research Topic
+            </Button>
+            <Button onClick={onGenerateArgument} disabled={isLoadingArgument || !topic || isLoadingResearch}>
+              {isLoadingArgument ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Sparkles className="mr-2 h-4 w-4" />
+              )}
+              Generate AI Argument
+            </Button>
+          </div>
+        )}
+        
+        {showLetsGoButton && (
+          <div className="pt-4 border-t">
+            <Button 
+              onClick={onLetsGo} 
+              className="w-full" 
+              size="lg"
+              disabled={!topic.trim()}
+            >
+              Let's Go! Start Debate
+            </Button>
+          </div>
+        )}
       </CardContent>
     </Card>
   );

@@ -4,7 +4,7 @@
 import type { DebateTurn } from '@/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { User, Bot, Loader2, Play, Pause, AlertCircle } from 'lucide-react';
+import { User, Bot, Loader2, Play, Pause } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import React, { useEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';

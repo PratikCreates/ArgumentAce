@@ -5,7 +5,7 @@ import type { AnalyzeArgumentOutput } from '@/types';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { AlertTriangle, CheckCircle, Lightbulb, MessageCircleQuestion, ThumbsUp, BotMessageSquare } from 'lucide-react';
+import { AlertTriangle, Lightbulb, MessageCircleQuestion, ThumbsUp, BotMessageSquare } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 
 interface FeedbackDisplayProps {
@@ -54,7 +54,7 @@ const FeedbackDisplay: React.FC<FeedbackDisplayProps> = ({ feedback, isLoading }
           <BotMessageSquare className="h-6 w-6 text-primary" />
           AI Feedback for Your Last Turn
         </CardTitle>
-        <CardDescription>Here's the AI's analysis of your most recent argument.</CardDescription>
+        <CardDescription>Here&apos;s the AI&apos;s analysis of your most recent argument.</CardDescription>
       </CardHeader>
       <CardContent>
         <Accordion type="multiple" defaultValue={['overall-feedback', 'fallacies', 'persuasion', 'counterpoints']} className="w-full">
@@ -76,8 +76,8 @@ const FeedbackDisplay: React.FC<FeedbackDisplayProps> = ({ feedback, isLoading }
               </div>
             </AccordionTrigger>
             <AccordionContent className="text-sm space-y-2">
-              {feedback.fallacies && feedback.fallacies.length > 0 ? (
-                feedback.fallacies.map((fallacy, index) => (
+              {feedback.logicalFallacies && feedback.logicalFallacies.length > 0 ? (
+                feedback.logicalFallacies.map((fallacy, index) => (
                   <Badge key={index} variant="destructive" className="mr-2 mb-2 p-2 text-sm">{fallacy}</Badge>
                 ))
               ) : (
@@ -93,8 +93,8 @@ const FeedbackDisplay: React.FC<FeedbackDisplayProps> = ({ feedback, isLoading }
               </div>
             </AccordionTrigger>
             <AccordionContent className="text-sm space-y-2">
-              {feedback.persuasionTechniques && feedback.persuasionTechniques.length > 0 ? (
-                feedback.persuasionTechniques.map((technique, index) => (
+              {feedback.persuasiveTechniques && feedback.persuasiveTechniques.length > 0 ? (
+                feedback.persuasiveTechniques.map((technique, index) => (
                   <Badge key={index} variant="secondary" className="mr-2 mb-2 p-2 text-sm bg-green-100 text-green-700 border-green-300">{technique}</Badge>
                 ))
               ) : (
@@ -110,9 +110,9 @@ const FeedbackDisplay: React.FC<FeedbackDisplayProps> = ({ feedback, isLoading }
                </div>
             </AccordionTrigger>
             <AccordionContent className="text-sm space-y-2">
-              {feedback.counterPoints && feedback.counterPoints.length > 0 ? (
+              {feedback.counterpoints && feedback.counterpoints.length > 0 ? (
                 <ul className="list-disc pl-5 space-y-1">
-                  {feedback.counterPoints.map((counter, index) => (
+                  {feedback.counterpoints.map((counter, index) => (
                     <li key={index}>{counter}</li>
                   ))}
                 </ul>

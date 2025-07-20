@@ -91,11 +91,11 @@ const SharedSessionDisplay: React.FC<SharedSessionDisplayProps> = ({ session }) 
                 </div>
               </div>
             </div>
-            {session.juryVerdict.keyMoments && session.juryVerdict.keyMoments.length > 0 && (
+            {session.juryVerdict.clashes && session.juryVerdict.clashes.length > 0 && (
               <div>
                 <h4 className="font-semibold text-lg mb-2 flex items-center gap-2"><Lightbulb className="h-5 w-5 text-accent"/>Key Moments</h4>
                 <ul className="list-disc space-y-1 pl-5 text-sm">
-                  {session.juryVerdict.keyMoments.map((moment, index) => <li key={index}>{moment}</li>)}
+                  {session.juryVerdict.clashes.map((clash, index) => <li key={index}>{clash.clashPoint}: {clash.summary}</li>)}
                 </ul>
               </div>
             )}
@@ -109,7 +109,7 @@ const SharedSessionDisplay: React.FC<SharedSessionDisplayProps> = ({ session }) 
         </Card>
       )}
 
-      {session.researchPoints && session.researchPoints.length > 0 && (
+      {session.researchPoints && (session.researchPoints.proPoints.length > 0 || session.researchPoints.conPoints.length > 0) && (
         <Card className="shadow-lg">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-xl">
@@ -118,11 +118,34 @@ const SharedSessionDisplay: React.FC<SharedSessionDisplayProps> = ({ session }) 
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <ul className="space-y-2 list-disc pl-5 text-sm">
-              {session.researchPoints.map((point, index) => (
-                <li key={index}>{point}</li>
-              ))}
-            </ul>
+            <div className="space-y-4">
+              <div>
+                <h4 className="font-medium mb-2">Arguments For:</h4>
+                <ul className="space-y-1 list-disc pl-5 text-sm">
+                  {session.researchPoints.proPoints.map((point, index) => (
+                    <li key={`pro-${index}`}>{point}</li>
+                  ))}
+                </ul>
+              </div>
+              <div>
+                <h4 className="font-medium mb-2">Arguments Against:</h4>
+                <ul className="space-y-1 list-disc pl-5 text-sm">
+                  {session.researchPoints.conPoints.map((point, index) => (
+                    <li key={`con-${index}`}>{point}</li>
+                  ))}
+                </ul>
+              </div>
+              {session.researchPoints.keyFacts && session.researchPoints.keyFacts.length > 0 && (
+                <div>
+                  <h4 className="font-medium mb-2">Key Facts:</h4>
+                  <ul className="space-y-1 list-disc pl-5 text-sm">
+                    {session.researchPoints.keyFacts.map((fact, index) => (
+                      <li key={`fact-${index}`}>{fact}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
           </CardContent>
         </Card>
       )}

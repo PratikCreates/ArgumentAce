@@ -1,13 +1,13 @@
 
 // src/lib/pdfGenerator.ts
 import { jsPDF } from 'jspdf';
-import type { DebateTurn, ReasoningSkill, JudgeDebateOutput, AnalyzeArgumentOutput } from '@/types';
+import type { DebateTurn, ReasoningSkill, JudgeDebateOutput, AnalyzeArgumentOutput, ResearchTopicOutput } from '@/types';
 
 export interface DebateSessionDataForPdf {
     topic: string;
     reasoningSkill: ReasoningSkill;
     debateLog: DebateTurn[];
-    researchPoints?: string[] | null;
+    researchPoints?: ResearchTopicOutput | null;
     juryVerdict?: JudgeDebateOutput | null;
 }
 
@@ -87,16 +87,50 @@ export async function generateDebatePdf(sessionData: DebateSessionDataForPdf): P
     doc.line(margin, y - 10, pageWidth - margin, y - 10);
     // END: Document Header
 
-    if (sessionData.researchPoints && sessionData.researchPoints.length > 0) {
+    if (sessionData.researchPoints && (sessionData.researchPoints.proPoints.length > 0 || sessionData.researchPoints.conPoints.length > 0)) {
         addSectionTitle('Research Points');
-        setFont('helvetica', 'normal', 10, TEXT_COLOR);
-        sessionData.researchPoints.forEach(point => {
-            const splitPoint = doc.splitTextToSize(`• ${point}`, pageWidth - margin * 2 - 10);
-            checkPageBreak(splitPoint.length * 10 + 5);
-            doc.text(splitPoint, margin + 10, y);
-            y += splitPoint.length * 10 + 5;
-        });
-        y += 10;
+        
+        if (sessionData.researchPoints.proPoints.length > 0) {
+            setFont('helvetica', 'bold', 11, TEXT_COLOR);
+            doc.text('Arguments For:', margin, y);
+            y += 15;
+            setFont('helvetica', 'normal', 10, TEXT_COLOR);
+            sessionData.researchPoints.proPoints.forEach(point => {
+                const splitPoint = doc.splitTextToSize(`• ${point}`, pageWidth - margin * 2 - 10);
+                checkPageBreak(splitPoint.length * 10 + 5);
+                doc.text(splitPoint, margin + 10, y);
+                y += splitPoint.length * 10 + 5;
+            });
+            y += 10;
+        }
+        
+        if (sessionData.researchPoints.conPoints.length > 0) {
+            setFont('helvetica', 'bold', 11, TEXT_COLOR);
+            doc.text('Arguments Against:', margin, y);
+            y += 15;
+            setFont('helvetica', 'normal', 10, TEXT_COLOR);
+            sessionData.researchPoints.conPoints.forEach(point => {
+                const splitPoint = doc.splitTextToSize(`• ${point}`, pageWidth - margin * 2 - 10);
+                checkPageBreak(splitPoint.length * 10 + 5);
+                doc.text(splitPoint, margin + 10, y);
+                y += splitPoint.length * 10 + 5;
+            });
+            y += 10;
+        }
+        
+        if (sessionData.researchPoints.keyFacts && sessionData.researchPoints.keyFacts.length > 0) {
+            setFont('helvetica', 'bold', 11, TEXT_COLOR);
+            doc.text('Key Facts:', margin, y);
+            y += 15;
+            setFont('helvetica', 'normal', 10, TEXT_COLOR);
+            sessionData.researchPoints.keyFacts.forEach(fact => {
+                const splitFact = doc.splitTextToSize(`• ${fact}`, pageWidth - margin * 2 - 10);
+                checkPageBreak(splitFact.length * 10 + 5);
+                doc.text(splitFact, margin + 10, y);
+                y += splitFact.length * 10 + 5;
+            });
+            y += 10;
+        }
     }
 
     if (sessionData.debateLog && sessionData.debateLog.length > 0) {
@@ -127,7 +161,7 @@ export async function generateDebatePdf(sessionData: DebateSessionDataForPdf): P
             y += boxHeight + 10;
 
             if (isUser && turn.feedback) {
-                const { fallacies, persuasionTechniques, feedback } = turn.feedback;
+                const { logicalFallacies, persuasiveTechniques, feedback } = turn.feedback;
                 
                 const addFeedbackList = (title: string, items: string[] | undefined) => {
                     let content = `**${title}**\n`;
@@ -144,7 +178,7 @@ export async function generateDebatePdf(sessionData: DebateSessionDataForPdf): P
                 y += 12;
 
                 setFont('helvetica', 'normal', 9, TEXT_COLOR);
-                let feedbackLines = doc.splitTextToSize(feedback, pageWidth - margin * 2 - 20);
+                const feedbackLines = doc.splitTextToSize(feedback, pageWidth - margin * 2 - 20);
                 checkPageBreak(feedbackLines.length * 9 + 5);
                 doc.text(feedbackLines, margin + 15, y);
                 y += feedbackLines.length * 9 + 10;
@@ -165,8 +199,8 @@ export async function generateDebatePdf(sessionData: DebateSessionDataForPdf): P
                     }
                 }
                 
-                drawFeedbackSubSection('Logical Fallacies Identified:', fallacies);
-                drawFeedbackSubSection('Persuasion Techniques Used:', persuasionTechniques);
+                drawFeedbackSubSection('Logical Fallacies Identified:', logicalFallacies);
+                drawFeedbackSubSection('Persuasion Techniques Used:', persuasiveTechniques);
 
                 y += 15;
             }
@@ -175,7 +209,7 @@ export async function generateDebatePdf(sessionData: DebateSessionDataForPdf): P
     }
 
     if (sessionData.juryVerdict) {
-        const { winner, overallAssessment, userStrengths, userWeaknesses, aiStrengths, aiWeaknesses, adviceForUser, keyMoments } = sessionData.juryVerdict;
+        const { winner, overallAssessment, userStrengths, userWeaknesses, aiStrengths, aiWeaknesses, adviceForUser } = sessionData.juryVerdict;
         addSectionTitle('Final Jury Verdict');
         
         if (winner) {
@@ -214,7 +248,7 @@ export async function generateDebatePdf(sessionData: DebateSessionDataForPdf): P
         addVerdictSection('User Weaknesses:', userWeaknesses);
         addVerdictSection('AI Strengths:', aiStrengths);
         addVerdictSection('AI Weaknesses:', aiWeaknesses);
-        addVerdictSection('Key Moments:', keyMoments);
+        // Key moments removed - using clashes instead if needed
         addVerdictSection('Advice for User:', adviceForUser);
         y += 10;
     }
